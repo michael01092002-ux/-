@@ -646,14 +646,15 @@ function setFetchStatus(msg,color){
 function setFetchBusy(b){
   ['fetchBtn','fetchBtn2'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.disabled=b; e.style.opacity=b?0.6:1; if(b)e.dataset.t=e.textContent, e.textContent='抓取中…'; else if(e.dataset.t)e.textContent=e.dataset.t; } });
 }
+function bust(url){ return url + (url.includes('?')?'&':'?') + '_=' + Date.now(); }
 async function fetchPrices(){
   // 收集系統內所有代碼
   const codes=[...new Set([...Object.keys(D.prices), ...D.transactions.map(t=>t.code), ...D.otherHoldings.map(o=>o.code)])];
   if(!codes.length){ setFetchStatus('沒有可更新的代碼','var(--amber)'); return; }
   setFetchBusy(true); setFetchStatus('連線中…');
   const exch = codes.map(c=> marketOf(c)+'_'+c+'.tw').join('|');
-  const target = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch='+encodeURIComponent(exch);
-  // 多個來源備援：直連 + 兩個公用 CORS 代理
+  const target = bust('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch='+encodeURIComponent(exch));
+  // 多個來源備援：直連 + 兩個公用 CORS 代理（皆破快取）
   const tries = [
     target,
     'https://api.allorigins.win/raw?url='+encodeURIComponent(target),
@@ -663,7 +664,7 @@ async function fetchPrices(){
   for(const url of tries){
     try{
       const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),8000);
-      const res=await fetch(url,{signal:ctrl.signal}); clearTimeout(to);
+      const res=await fetch(url,{signal:ctrl.signal,cache:'no-store'}); clearTimeout(to);
       if(!res.ok) continue;
       const txt=await res.text();
       const j=JSON.parse(txt);
@@ -684,7 +685,7 @@ async function fetchPrices(){
     if(!isNaN(p) && p>0){ D.prices[code]=p; ok++; } else { miss.push(code); }
   }
   save(); renderAll();
-  const now=new Date().toTimeString().slice(0,5);
+  const now=new Date().toTimeString().slice(0,8);
   let msg=`✓ 線上更新 ${now}（${used}）已更新 ${ok} 檔`;
   if(miss.length) msg+=`；無報價：${miss.join('、')}（可能休市或上櫃代碼，手動補）`;
   setFetchBusy(false);
@@ -866,31 +867,27 @@ function importData(e){ const f=e.target.files[0]; if(!f)return; const rd=new Fi
   rd.onload=()=>{ try{ D=JSON.parse(rd.result); save(); renderAll(); alert('匯入成功'); }catch(err){ alert('檔案格式錯誤'); } }; rd.readAsText(f); }
 function resetAll(){ if(confirm('回復成預設資料？目前資料會被覆蓋（建議先匯出備份）')){ D=JSON.parse(JSON.stringify(DEFAULT)); sim={}; save(); renderAll(); } }
 
-// ============ 盤勢指標（加權指數＋台指期夜盤）============
+// ============ 盤勢指標（加權指數走證交所；台指期純手動）============
 async function tryFetch(urls){
-  for(const u of urls){ try{ const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),9000);
-    const r=await fetch(u,{signal:ctrl.signal}); clearTimeout(to); if(!r.ok) continue;
+  for(const u of urls){ try{ const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch(u,{signal:ctrl.signal,cache:'no-store'}); clearTimeout(to); if(!r.ok) continue;
     const t=await r.text(); return JSON.parse(t); }catch(e){} } return null;
 }
-function proxied(url){ return [url, 'https://api.allorigins.win/raw?url='+encodeURIComponent(url), 'https://corsproxy.io/?url='+encodeURIComponent(url)]; }
-async function yahooChart(sym,opts){ // 回傳 {price,prevClose,highs[],lows[],closes[]}
-  const url='https://query1.finance.yahoo.com/v8/finance/chart/'+sym+(opts||'?interval=1d&range=1mo');
-  const j=await tryFetch(proxied(url)); if(!j||!j.chart||!j.chart.result) return null;
-  const R=j.chart.result[0]; const q=R.indicators.quote[0];
-  return {price:R.meta.regularMarketPrice, prevClose:R.meta.chartPreviousClose||R.meta.previousClose,
-    highs:(q.high||[]).filter(x=>x!=null), lows:(q.low||[]).filter(x=>x!=null), closes:(q.close||[]).filter(x=>x!=null)};
-}
+function proxied(url){ url=bust(url); return [url, 'https://api.allorigins.win/raw?url='+encodeURIComponent(url), 'https://corsproxy.io/?url='+encodeURIComponent(url)]; }
 async function fetchMarket(){
   const st=document.getElementById('mktStatus'); st.style.color='var(--muted)'; st.textContent='抓取中…';
-  let ok=0;
-  const twii=await yahooChart('%5ETWII'); // 加權指數
-  if(twii&&twii.price){ D.market.twii=twii.price; D.market.twiiChg=twii.prevClose?(twii.price-twii.prevClose):null; ok++; }
-  // 台指期夜盤：嘗試 Yahoo 期貨代碼（可能無資料，失敗就維持手動值）
-  const txf=await yahooChart('%5ETWIIF').catch(()=>null);
-  if(txf&&txf.price){ D.market.txf=txf.price; D.market.txfChg=txf.prevClose?(txf.price-txf.prevClose):null; ok++; }
+  // 加權指數 via 證交所 MIS（與刷新股價同一個能用的端點）
+  const url='https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=tse_t00.tw';
+  const j=await tryFetch(proxied(url));
+  let ok=false;
+  if(j&&j.msgArray&&j.msgArray.length){
+    const m=j.msgArray[0]; let z=parseFloat(m.z); if(isNaN(z)||m.z==='-') z=parseFloat(m.y);
+    const y=parseFloat(m.y);
+    if(!isNaN(z)){ D.market.twii=z; D.market.twiiChg=!isNaN(y)?(z-y):null; ok=true; }
+  }
   save(); renderMarket();
-  if(ok){ st.style.color='var(--down)'; st.textContent='✓ 已更新 '+ok+' 項 '+new Date().toTimeString().slice(0,5); }
-  else { st.style.color='var(--amber)'; st.textContent='⚠ 抓取失敗，請手動填台指期（按右上「手動」）'; }
+  if(ok){ st.style.color='var(--down)'; st.textContent='✓ 加權指數已更新 '+new Date().toTimeString().slice(0,5)+'（台指期請按右上「手動」）'; }
+  else { st.style.color='var(--amber)'; st.textContent='⚠ 加權指數抓取失敗，可稍後再試'; }
 }
 function renderMarket(){
   const m=D.market||{};
@@ -901,45 +898,61 @@ function renderMarket(){
   document.getElementById('mkt_txf').textContent = m.txf? fmt(m.txf,0):'—';
   const fc=document.getElementById('mkt_txf_chg');
   if(m.txfChg!=null){ fc.textContent=signTxt(m.txfChg,0)+'　夜盤'; fc.className='note '+signCls(m.txfChg); }
+  else fc.textContent='夜盤 15:00–05:00（手動填）';
 }
 function editTxf(){
   const v=prompt('輸入台指期夜盤點數（例 23150）：', D.market.txf||'');
   if(v===null) return; const n=parseFloat(v); if(isNaN(n)) return;
-  const c=prompt('漲跌點數（例 +120 或 -80，可空）：', D.market.txfChg||'');
+  const c=prompt('漲跌點數（例 120 或 -80，可空）：', D.market.txfChg||'');
   D.market.txf=n; D.market.txfChg = c===null||c===''? null : parseFloat(c);
   save(); renderMarket();
 }
 
-// ============ WINSMART 移動停利監控 ============
+// ============ WINSMART 移動停利監控（日K走證交所 STOCK_DAY）============
 let pollTimer=null;
 function saveMonCfg(){ D.monCfg={atrMul:+document.getElementById('p_atrMul').value, retr:+document.getElementById('p_retr').value, maxLoss:+document.getElementById('p_maxloss').value}; save(); }
 function loadMonCfg(){ const c=D.monCfg||{}; document.getElementById('p_atrMul').value=c.atrMul??2.5; document.getElementById('p_retr').value=c.retr??8; document.getElementById('p_maxloss').value=c.maxLoss??50000; }
-function ladderFloor(cost,price){ // 階梯保利：回傳鎖住的底線價
-  const g=(price-cost)/cost; const L=[[0.15,0.10],[0.10,0.06],[0.06,0.03],[0.03,0.00]];
-  for(const [t,lock] of L){ if(g>=t) return cost*(1+lock); } return null;
+function ladderFloor(cost,price){ const g=(price-cost)/cost; const L=[[0.15,0.10],[0.10,0.06],[0.06,0.03],[0.03,0.00]];
+  for(const [t,lock] of L){ if(g>=t) return cost*(1+lock); } return null; }
+async function twseDaily(code){ // 證交所 STOCK_DAY（僅上市）
+  const now=new Date();
+  const ym=d=>''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+'01';
+  const prev=new Date(now.getFullYear(), now.getMonth()-1, 1);
+  let rows=[];
+  for(const mm of [ym(prev), ym(now)]){
+    const url='https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date='+mm+'&stockNo='+code;
+    const j=await tryFetch(proxied(url)); if(j&&j.data) rows=rows.concat(j.data);
+  }
+  if(!rows.length) return null;
+  const highs=[],lows=[],closes=[];
+  for(const r of rows){ const h=parseFloat(String(r[4]).replace(/,/g,'')), l=parseFloat(String(r[5]).replace(/,/g,'')), c=parseFloat(String(r[6]).replace(/,/g,''));
+    if(!isNaN(h)&&!isNaN(l)){ highs.push(h); lows.push(l); closes.push(c); } }
+  return highs.length? {highs,lows,closes,prevClose:closes[closes.length-1]} : null;
 }
 async function runMonitor(){
   const r=compute(); const codes=[...new Set(r.holds.map(h=>h.code))];
-  const st=document.getElementById('monStatus'); st.style.color='var(--muted)'; st.textContent='抓日K算ATR…';
+  const st=document.getElementById('monStatus'); st.style.color='var(--muted)'; st.textContent='向證交所抓日K算ATR…';
+  let ok=0, manual=[];
   for(const c of codes){
-    const sym = c + (marketOf(c)==='otc'?'.TWO':'.TW');
-    const k=await yahooChart(sym);
+    if(marketOf(c)==='otc'){ manual.push(c); continue; } // 上櫃證交所無此表，走手動
+    const k=await twseDaily(c);
     if(k){
-      // ATR14（簡化：用每日 high-low 的平均）
       const n=Math.min(14,k.highs.length); let atr=0,cnt=0;
-      for(let i=k.highs.length-n;i<k.highs.length;i++){ if(k.highs[i]!=null&&k.lows[i]!=null){ atr+=(k.highs[i]-k.lows[i]); cnt++; } }
-      atr = cnt? atr/cnt : 0;
-      const low3 = Math.min(...k.lows.slice(-3));
-      const recentHigh = Math.max(...k.highs.slice(-20));
-      D.peaks[c] = Math.max(D.peaks[c]||0, recentHigh, r.px[c]||0);
-      D._atr = D._atr||{}; D._atr[c]=atr;
-      D._low3 = D._low3||{}; D._low3[c]=low3;
-      if(k.prevClose) D.prevClose[c]=k.prevClose;
-    }
+      for(let i=k.highs.length-n;i<k.highs.length;i++){ atr+=(k.highs[i]-k.lows[i]); cnt++; }
+      D._atr=D._atr||{}; D._atr[c]=cnt?atr/cnt:0;
+      D._low3=D._low3||{}; D._low3[c]=Math.min(...k.lows.slice(-3));
+      D.peaks=D.peaks||{}; D.peaks[c]=Math.max(D.peaks[c]||0, Math.max(...k.highs.slice(-20)), r.px[c]||0);
+      if(k.prevClose){ D.prevClose=D.prevClose||{}; D.prevClose[c]=k.prevClose; }
+      ok++;
+    } else manual.push(c);
   }
   save(); renderMonitor();
-  st.style.color='var(--down)'; st.textContent='✓ 更新 '+new Date().toTimeString().slice(0,5);
+  let msg='✓ 上市自動更新 '+ok+' 檔';
+  if(manual.length) msg+='；'+manual.join('、')+'（上櫃/失敗）請點表格數字手動填 ATR、3日低、波段高';
+  st.style.color= ok?'var(--down)':'var(--amber)'; st.textContent=msg;
 }
+function editAtr(c){ const v=prompt('輸入 '+c+' 的 ATR 值（每日波動幅度，可從看盤軟體看）：',(D._atr&&D._atr[c])||''); if(v===null)return; const n=parseFloat(v); if(!isNaN(n)){ D._atr=D._atr||{}; D._atr[c]=n; save(); renderMonitor(); } }
+function editLow3(c){ const v=prompt('輸入 '+c+' 的近 3 日最低價：',(D._low3&&D._low3[c])||''); if(v===null)return; const n=parseFloat(v); if(!isNaN(n)){ D._low3=D._low3||{}; D._low3[c]=n; save(); renderMonitor(); } }
 function renderMonitor(){
   const r=compute(); const cfg=D.monCfg||{atrMul:2.5,retr:8,maxLoss:50000};
   const tb=document.querySelector('#monTable tbody'); tb.innerHTML='';
@@ -960,9 +973,11 @@ function renderMonitor(){
     const ledc = breached?'var(--danger)' : (guard && px< guard*1.02 ? 'var(--amber)':'var(--down)');
     const stTxt = breached?'🔴 跌破':(guard && px<guard*1.02?'🟡 接近':'🟢 安全');
     const cell=v=> v? fmt(v,2):'—';
+    const dash='cursor:pointer;border-bottom:1px dashed var(--dim)';
     tb.innerHTML+=`<tr><td>${h.name} <span class="tag">${c}</span></td><td class="num">${fmt(px,2)}</td>
-      <td class="num"><span onclick="editPeak('${c}')" style="cursor:pointer;border-bottom:1px dashed var(--dim)">${fmt(peak,2)}</span></td>
-      <td class="num">${cell(atrLine)}</td><td class="num">${cell(ladder)}</td><td class="num">${cell(retrLine)}</td><td class="num">${cell(low3)}</td>
+      <td class="num"><span onclick="editPeak('${c}')" style="${dash}">${fmt(peak,2)}</span></td>
+      <td class="num"><span onclick="editAtr('${c}')" style="${dash}" title="點擊手動填ATR">${cell(atrLine)}</span></td><td class="num">${cell(ladder)}</td><td class="num">${cell(retrLine)}</td>
+      <td class="num"><span onclick="editLow3('${c}')" style="${dash}" title="點擊手動填3日低">${cell(low3)}</span></td>
       <td class="num" style="font-weight:700;color:${ledc}">${cell(guard)}</td>
       <td style="color:${ledc};font-weight:600">${stTxt}</td></tr>`;
   }

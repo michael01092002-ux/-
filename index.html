@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>投資損益・風控試算系統</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --line:#2a3340;
+  --txt:#e6edf3; --muted:#8b98a5; --dim:#5b6673;
+  --up:#ff5d5d; --down:#23c06b;        /* 台股慣例：紅漲綠跌 */
+  --blue:#4f9dff; --amber:#e3a008; --danger:#f7544e;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Consolas",monospace;
+  --sans:-apple-system,"Segoe UI","Microsoft JhengHei","PingFang TC","Noto Sans CJK TC",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+header{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0 16px;border-bottom:1px solid var(--line);margin-bottom:16px}
+header h1{font-size:18px;font-weight:700;letter-spacing:.5px}
+header h1 .sub{color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+button{font-family:var(--sans);cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);padding:6px 12px;border-radius:6px;font-size:13px;transition:.15s}
+button:hover{border-color:var(--blue);color:#fff}
+button.primary{background:var(--blue);border-color:var(--blue);color:#04101f;font-weight:600}
+button.primary:hover{background:#6fb0ff}
+button.ghost{background:transparent}
+button.tiny{padding:3px 8px;font-size:12px}
+button.del{border-color:#4a2630;color:#ff8a8a}
+button.del:hover{background:#3a1c24;border-color:var(--danger)}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px}
+nav.tabs button{border-radius:8px 8px 0 0;border-bottom:2px solid transparent;background:transparent}
+nav.tabs button.active{background:var(--panel);border-color:var(--line);border-bottom:2px solid var(--blue);color:#fff}
+.tab{display:none}.tab.active{display:block;animation:fade .2s}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .lbl{color:var(--muted);font-size:12px;letter-spacing:.3px;margin-bottom:6px}
+.card .val{font-family:var(--mono);font-size:24px;font-weight:700;letter-spacing:-.5px}
+.card .note{font-size:11px;color:var(--dim);margin-top:4px}
+.gauge-card{grid-column:span 2}
+@media(max-width:520px){.gauge-card{grid-column:span 1}}
+.gauge{height:14px;border-radius:8px;background:var(--panel2);overflow:hidden;margin-top:8px;position:relative;border:1px solid var(--line)}
+.gauge .fill{height:100%;transition:width .4s,background .4s}
+.gauge-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-top:3px;font-family:var(--mono)}
+.statusdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12px;text-align:right;position:sticky;top:0;background:var(--panel)}
+th:first-child,td:first-child{text-align:left}
+td.code{font-family:var(--mono);color:var(--blue)}
+tbody tr:hover{background:var(--panel2)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px;overflow-x:auto}
+.panel h2{font-size:14px;margin-bottom:12px;color:var(--txt);font-weight:700;letter-spacing:.3px}
+.panel h2 .hint{font-weight:400;color:var(--dim);font-size:12px;margin-left:8px}
+input,select{font-family:var(--mono);background:var(--bg);border:1px solid var(--line);color:var(--txt);padding:5px 8px;border-radius:5px;font-size:13px;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--blue)}
+select{font-family:var(--sans)}
+.up{color:var(--up)}.down{color:var(--down)}
+.formrow{display:grid;grid-template-columns:repeat(6,1fr) auto;gap:8px;align-items:end;margin-bottom:10px}
+.formrow label{display:block}.formrow .flbl{font-size:11px;color:var(--muted);margin-bottom:3px}
+@media(max-width:720px){.formrow{grid-template-columns:repeat(2,1fr)}}
+.pillrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;align-items:center;max-width:480px}
+.kv label{color:var(--muted);font-size:13px}
+.simgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.simbox{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px}
+.simbox .nm{font-weight:600;margin-bottom:8px}
+.simbox input[type=range]{width:100%;padding:0}
+.simval{font-family:var(--mono);font-size:13px;display:flex;justify-content:space-between;margin-top:6px;color:var(--muted)}
+.banner{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;border:1px solid}
+.banner.safe{background:#0e2a1a;border-color:#1e5837;color:#7ee2a8}
+.banner.warn{background:#2b2410;border-color:#5e4e16;color:#e8c560}
+.banner.danger{background:#2e1416;border-color:#5e1f22;color:#ff9b96}
+.foot{color:var(--dim);font-size:11px;text-align:center;padding:20px 0 8px;line-height:1.7}
+.empty{color:var(--dim);text-align:center;padding:24px;font-size:13px}
+.tag{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>投資損益・風控試算系統<span class="sub">單一資料源・離線・貼價即刷新</span></h1>
+  <div class="toolbar">
+    <button class="primary tiny" onclick="fetchPrices()" id="fetchBtn2">🔄 線上刷新股價</button>
+    <button class="ghost tiny" onclick="exportData()">匯出備份</button>
+    <button class="ghost tiny" onclick="document.getElementById('imp').click()">匯入備份</button>
+    <input type="file" id="imp" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="del tiny" onclick="resetAll()">回復預設</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-tab="dash" onclick="tab('dash')">儀表板</button>
+  <button data-tab="monitor" onclick="tab('monitor')">盯盤監控</button>
+  <button data-tab="risk" onclick="tab('risk')">風控與預測</button>
+  <button data-tab="tx" onclick="tab('tx')">交易明細</button>
+  <button data-tab="other" onclick="tab('other')">其他帳戶持股</button>
+  <button data-tab="div" onclick="tab('div')">股利與趨勢</button>
+  <button data-tab="set" onclick="tab('set')">現價與質押設定</button>
+</nav>
+
+<!-- DASHBOARD -->
+<section id="dash" class="tab active">
+  <div class="cards">
+    <div class="card"><div class="lbl">總市值（現在值多少）</div><div class="val num" id="c_mv">—</div><div class="note">全部帳戶股票市值</div></div>
+    <div class="card"><div class="lbl">自有資金淨值（你的錢）</div><div class="val num" id="c_eq">—</div><div class="note">總市值 − 質押借款</div></div>
+    <div class="card"><div class="lbl">槓桿倍數</div><div class="val num" id="c_lev">—</div><div class="note">總市值 ÷ 自有淨值</div></div>
+    <div class="card"><div class="lbl">未實現損益（手上抱的）</div><div class="val num" id="c_unreal">—</div><div class="note" id="c_unreal_pct">—</div></div>
+    <div class="card"><div class="lbl">已實現損益（落袋的）</div><div class="val num" id="c_real">—</div><div class="note">本期賣出價差累計</div></div>
+    <div class="card"><div class="lbl">已收股利</div><div class="val num" id="c_div">—</div><div class="note" id="c_withdiv">含息總損益 —</div></div>
+    <div class="card gauge-card">
+      <div class="lbl"><span class="statusdot" id="dot"></span>整戶維持率 <span id="c_mr_status" class="tag"></span></div>
+      <div class="val num" id="c_mr">—</div>
+      <div class="gauge"><div class="fill" id="gfill"></div></div>
+      <div class="gauge-ticks"><span id="callmark">追繳 130%</span><span>160%</span><span>250%+</span></div>
+    </div>
+  </div>
+
+  <div class="banner" id="riskBanner"></div>
+
+  <div class="panel">
+    <h2>持股彙整 <span class="hint">交易明細自動推算（移動平均成本）＋其他帳戶持股</span></h2>
+    <table id="holdTable">
+      <thead><tr><th>股票</th><th>帳戶</th><th>股數</th><th>成本均價</th><th>還原均價</th><th>現價</th><th>投入成本</th><th>市值</th><th>未實現損益</th><th>報酬率</th><th>含息報酬</th></tr></thead>
+      <tbody></tbody>
+      <tfoot></tfoot>
+    </table>
+  </div>
+</section>
+
+<!-- MONITOR -->
+<section id="monitor" class="tab">
+  <div class="panel">
+    <h2>盤勢指標 <span class="hint">加權指數／台指期夜盤；盤中自動刷新或手動填</span></h2>
+    <div class="pillrow">
+      <button class="primary tiny" onclick="fetchMarket()" id="mktBtn">🔄 抓盤勢</button>
+      <span id="mktStatus" style="font-size:12px;color:var(--muted);align-self:center"></span>
+    </div>
+    <div class="cards" style="margin-bottom:0">
+      <div class="card"><div class="lbl">加權指數 TAIEX</div><div class="val num" id="mkt_twii">—</div><div class="note" id="mkt_twii_chg">—</div></div>
+      <div class="card"><div class="lbl">台指期（夜盤）<button class="tiny ghost" style="float:right;padding:1px 6px" onclick="editTxf()">手動</button></div><div class="val num" id="mkt_txf">—</div><div class="note" id="mkt_txf_chg">夜盤 15:00–05:00</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>移動停利監控 <span class="hint">WINSMART 邏輯：ATR停利＋階梯保利＋最高回檔＋3日低（只示警不下單）</span></h2>
+    <div class="pillrow">
+      <button class="primary tiny" onclick="runMonitor()" id="monBtn">🔄 更新停利線（抓日K算ATR）</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><input type="checkbox" id="autoPoll" style="width:auto" onchange="togglecPoll()">盤中自動盯（每30秒）</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><input type="checkbox" id="notifyOn" style="width:auto" onchange="askNotify()">跌破跳通知</label>
+      <span id="monStatus" style="font-size:12px;color:var(--muted);align-self:center"></span>
+    </div>
+    <div class="simgrid" style="margin-bottom:12px">
+      <div class="simbox"><div class="nm" style="font-size:12px;color:var(--muted)">ATR 倍數（越大越寬鬆）</div><input class="num" id="p_atrMul" type="number" step="0.1" value="2.5" onchange="saveMonCfg();runMonitor()"></div>
+      <div class="simbox"><div class="nm" style="font-size:12px;color:var(--muted)">最高點回檔 %</div><input class="num" id="p_retr" type="number" step="0.5" value="8" onchange="saveMonCfg();runMonitor()"></div>
+      <div class="simbox"><div class="nm" style="font-size:12px;color:var(--muted)">全戶當日最大虧損（元）</div><input class="num" id="p_maxloss" type="number" value="50000" onchange="saveMonCfg();runMonitor()"></div>
+    </div>
+    <div id="dayLossBanner"></div>
+    <div style="overflow-x:auto"><table id="monTable">
+      <thead><tr><th>股票</th><th>現價</th><th>波段高</th><th>ATR停利</th><th>階梯保底</th><th>回檔線</th><th>3日低</th><th>綜合警戒</th><th>狀態</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="note" style="color:var(--dim);font-size:11px;margin-top:8px">綜合警戒＝四條線取最高者（最接近現價的防線）。現價跌破即紅燈。此為輔助示警，不取代你的判斷，更不會自動下單。日K與ATR向 Yahoo 抓取，失敗時可手動填波段高。</p>
+  </div>
+</section>
+
+<!-- RISK -->
+<section id="risk" class="tab">
+  <div class="panel">
+    <h2>情境模擬器 <span class="hint">拉動每檔漲跌幅，下方即時重算（紅漲綠跌）</span></h2>
+    <div class="simgrid" id="simGrid"></div>
+    <div class="cards">
+      <div class="card"><div class="lbl">模擬後總市值</div><div class="val num" id="s_mv">—</div></div>
+      <div class="card"><div class="lbl">模擬後自有淨值</div><div class="val num" id="s_eq">—</div></div>
+      <div class="card"><div class="lbl">模擬後維持率</div><div class="val num" id="s_mr">—</div></div>
+      <div class="card"><div class="lbl">模擬後總損益（含已實現）</div><div class="val num" id="s_pnl">—</div></div>
+    </div>
+    <button class="ghost tiny" onclick="resetSim()">歸零（回到現價）</button>
+  </div>
+
+  <div class="panel">
+    <h2>追繳線距離 <span class="hint">維持率掉到追繳水位時，各檔的價位與還能跌多少</span></h2>
+    <table id="callTable">
+      <thead><tr><th>質押股票</th><th>目前現價</th><th>單跌觸及追繳價</th><th>還能跌</th><th>全檔等比觸及追繳</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="note" style="color:var(--dim);font-size:11px;margin-top:8px">「單跌」=只有這一檔跌、其他不動時的觸及價；「全檔等比」=三檔同步下跌同一比例時觸及追繳的跌幅。</p>
+  </div>
+
+  <div class="panel">
+    <h2>價格敏感度 <span class="hint">各檔不同漲跌幅下的整戶未實現損益與維持率</span></h2>
+    <table id="sensTable">
+      <thead><tr><th>漲跌幅</th><th>-20%</th><th>-10%</th><th>-5%</th><th>現價</th><th>+5%</th><th>+10%</th><th>+20%</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- TRANSACTIONS -->
+<section id="tx" class="tab">
+  <div class="panel">
+    <h2>新增交易</h2>
+    <div class="formrow">
+      <label><div class="flbl">日期</div><input type="date" id="tx_date"></label>
+      <label><div class="flbl">買/賣</div><select id="tx_type"><option value="buy">買進</option><option value="sell">賣出</option></select></label>
+      <label><div class="flbl">代碼</div><input id="tx_code" placeholder="2344"></label>
+      <label><div class="flbl">名稱</div><input id="tx_name" placeholder="華邦電"></label>
+      <label><div class="flbl">股數</div><input id="tx_shares" type="number" placeholder="1000"></label>
+      <label><div class="flbl">成交價</div><input id="tx_price" type="number" step="0.01" placeholder="219"></label>
+      <button class="primary" onclick="addTx()">新增</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>券商 Excel／CSV 匯入 <span class="hint">元大、兆豐等下載的交易明細直接匯入；自動對欄，可預覽後確認</span></h2>
+    <div class="pillrow">
+      <button class="primary tiny" onclick="document.getElementById('brokerFile').click()">選擇 Excel／CSV 檔</button>
+      <input type="file" id="brokerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="parseBrokerFile(event)">
+      <span id="impStatus" style="font-size:12px;color:var(--muted);align-self:center"></span>
+    </div>
+    <div id="mapArea" style="display:none">
+      <p class="note" style="color:var(--muted);font-size:12px;margin-bottom:8px">請確認各欄位對應（系統已自動猜測，錯了就改）：</p>
+      <div class="formrow" id="mapRow"></div>
+      <div class="pillrow">
+        <button class="primary tiny" onclick="confirmImport()">確認匯入</button>
+        <button class="ghost tiny" onclick="cancelImport()">取消</button>
+        <span id="previewInfo" style="font-size:12px;color:var(--muted);align-self:center"></span>
+      </div>
+      <div style="overflow-x:auto;max-height:240px;overflow-y:auto"><table id="previewTable" style="font-size:12px"></table></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>交易明細 <span class="hint" id="txcount"></span></h2>
+    <table id="txTable">
+      <thead><tr><th>日期</th><th>別</th><th>代碼</th><th>名稱</th><th>股數</th><th>成交價</th><th>價金</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- OTHER HOLDINGS -->
+<section id="other" class="tab">
+  <div class="panel">
+    <h2>其他帳戶持股 <span class="hint">沒有交易明細的部位（例：別家銀行庫存），直接填現有張數與成本</span></h2>
+    <div class="formrow">
+      <label><div class="flbl">代碼</div><input id="oh_code" placeholder="3689"></label>
+      <label><div class="flbl">名稱</div><input id="oh_name" placeholder="湧德"></label>
+      <label><div class="flbl">帳戶</div><input id="oh_acc" placeholder="某銀行"></label>
+      <label><div class="flbl">股數</div><input id="oh_shares" type="number" placeholder="4000"></label>
+      <label><div class="flbl">成本均價</div><input id="oh_cost" type="number" step="0.01" placeholder="121.5"></label>
+      <button class="primary" onclick="addOther()">新增</button>
+    </div>
+    <table id="otherTable">
+      <thead><tr><th>代碼</th><th>名稱</th><th>帳戶</th><th>股數</th><th>成本均價</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- DIVIDEND & TREND -->
+<section id="div" class="tab">
+  <div class="panel">
+    <h2>維持率趨勢 <span class="hint">每天打開會自動記錄一次；也可手動記錄。紅色虛線為追繳水位</span></h2>
+    <div class="pillrow">
+      <button class="primary tiny" onclick="snapshot(true)">記錄今日維持率</button>
+      <button class="del tiny" onclick="clearHist()">清空趨勢記錄</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><input type="checkbox" id="showMv" style="width:auto" checked onchange="drawMrChart()">疊上總市值線</label>
+    </div>
+    <div id="mrChart"></div>
+  </div>
+  <div class="panel">
+    <h2>除息倒數 <span class="hint">下次除息日與預估可領金額；日期公告後請更新</span></h2>
+    <div class="pillrow">
+      <button class="primary tiny" onclick="fetchDividends()" id="divBtn">🔄 自動查除息（持股全部）</button>
+      <span id="divStatus" style="font-size:12px;color:var(--muted);align-self:center"></span>
+    </div>
+    <div class="formrow">
+      <label><div class="flbl">除息日</div><input type="date" id="up_date"></label>
+      <label><div class="flbl">代碼</div><input id="up_code" placeholder="3689"></label>
+      <label><div class="flbl">名稱</div><input id="up_name" placeholder="湧德"></label>
+      <label><div class="flbl">預估每股股利</div><input id="up_per" type="number" step="0.001" placeholder="2.922"></label>
+      <button class="primary" onclick="addUpcoming()">新增/更新</button>
+    </div>
+    <div id="upcomingList"></div>
+  </div>
+  <div class="panel">
+    <h2>股利／配息記錄 <span class="hint">現金股利會降低你的真實成本；填除息日與每股股利，系統自動依當時持股算實收（也可手動填實收金額）</span></h2>
+    <div class="formrow">
+      <label><div class="flbl">除息日</div><input type="date" id="dv_date"></label>
+      <label><div class="flbl">代碼</div><input id="dv_code" placeholder="3689"></label>
+      <label><div class="flbl">名稱</div><input id="dv_name" placeholder="湧德"></label>
+      <label><div class="flbl">每股現金股利</div><input id="dv_per" type="number" step="0.001" placeholder="2.922"></label>
+      <label><div class="flbl">實收金額(可空)</div><input id="dv_recv" type="number" placeholder="自動計算"></label>
+      <button class="primary" onclick="addDiv()">新增</button>
+    </div>
+    <table id="divTable">
+      <thead><tr><th>除息日</th><th>代碼</th><th>名稱</th><th>每股股利</th><th>除息日持股</th><th>實收金額</th><th></th></tr></thead>
+      <tbody></tbody>
+      <tfoot></tfoot>
+    </table>
+    <p class="note" style="color:var(--dim);font-size:11px;margin-top:8px">提醒：湧德約每年 8 月除息（去年 2.922 元）。以你現在 15 張估，除息可領約 4.4 萬，記一筆後真實成本就會往下修。</p>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="set" class="tab">
+  <div class="panel">
+    <h2>現價設定 <span class="hint">盤中把即時價貼進來，整個系統就刷新</span></h2>
+    <div class="pillrow">
+      <button class="primary tiny" onclick="fetchPrices()" id="fetchBtn">🔄 線上刷新股價</button>
+      <span id="fetchStatus" style="font-size:12px;color:var(--muted);align-self:center"></span>
+    </div>
+    <table id="priceTable">
+      <thead><tr><th>代碼</th><th>名稱</th><th>市場</th><th>現價</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>質押與借款設定</h2>
+    <div class="kv">
+      <label>已借金額</label><input class="num" id="set_loan" type="number" onchange="saveSettings()">
+      <label>借款額度</label><input class="num" id="set_limit" type="number" onchange="saveSettings()">
+      <label>追繳維持率 (%)</label><input class="num" id="set_call" type="number" onchange="saveSettings()">
+    </div>
+    <h2 style="margin-top:16px">各檔質押張數 <span class="hint">作為擔保品的張數（僅兆豐交易帳戶部位可質押）</span></h2>
+    <table id="pledgeTable">
+      <thead><tr><th>代碼</th><th>名稱</th><th>現有張數</th><th>質押張數</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<div class="foot">
+  資料只存在你這台裝置的瀏覽器（localStorage），離線可用，不上傳任何地方。<br>
+  換裝置或清快取前請先「匯出備份」。本系統為個人試算工具，非投資建議。
+</div>
+</div>
+
+<script>
+const DEFAULT_TX = [{"date": "2026-01-02", "type": "buy", "code": "3689", "name": "湧德", "shares": 6000, "price": 124}, {"date": "2026-01-02", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 124}, {"date": "2026-01-02", "type": "buy", "code": "3689", "name": "湧德", "shares": 3000, "price": 124}, {"date": "2026-01-02", "type": "sell", "code": "3689", "name": "湧德", "shares": 10000, "price": 126.5}, {"date": "2026-01-02", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-02", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-02", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-02", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 123.5}, {"date": "2026-01-02", "type": "sell", "code": "3689", "name": "湧德", "shares": 5000, "price": 126}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-05", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 130}, {"date": "2026-01-07", "type": "buy", "code": "3689", "name": "湧德", "shares": 8000, "price": 130}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 2000, "price": 123.5}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 5000, "price": 123.5}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 7000, "price": 123.5}, {"date": "2026-01-09", "type": "buy", "code": "3689", "name": "湧德", "shares": 17000, "price": 123.5}, {"date": "2026-01-09", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 123.5}, {"date": "2026-01-12", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 123}, {"date": "2026-01-22", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 125}, {"date": "2026-01-22", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 125}, {"date": "2026-01-22", "type": "buy", "code": "3689", "name": "湧德", "shares": 8000, "price": 125}, {"date": "2026-01-22", "type": "buy", "code": "3689", "name": "湧德", "shares": 4000, "price": 125.5}, {"date": "2026-01-22", "type": "buy", "code": "3689", "name": "湧德", "shares": 6000, "price": 125.5}, {"date": "2026-01-22", "type": "sell", "code": "3689", "name": "湧德", "shares": 20000, "price": 123.5}, {"date": "2026-01-22", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-01-23", "type": "buy", "code": "3689", "name": "湧德", "shares": 6000, "price": 121}, {"date": "2026-01-23", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 120.5}, {"date": "2026-01-23", "type": "buy", "code": "3689", "name": "湧德", "shares": 5000, "price": 120.5}, {"date": "2026-02-09", "type": "buy", "code": "3689", "name": "湧德", "shares": 9000, "price": 114.5}, {"date": "2026-02-09", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 114.5}, {"date": "2026-02-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 3000, "price": 112}, {"date": "2026-02-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 112}, {"date": "2026-02-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 112}, {"date": "2026-02-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 112}, {"date": "2026-02-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 112}, {"date": "2026-02-09", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 112}, {"date": "2026-04-08", "type": "sell", "code": "3689", "name": "湧德", "shares": 5000, "price": 125}, {"date": "2026-04-08", "type": "sell", "code": "3689", "name": "湧德", "shares": 8000, "price": 125}, {"date": "2026-04-08", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 125}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 3000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 5000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-10", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-13", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 143}, {"date": "2026-04-13", "type": "buy", "code": "3689", "name": "湧德", "shares": 4000, "price": 143}, {"date": "2026-04-13", "type": "sell", "code": "3689", "name": "湧德", "shares": 3000, "price": 138.5}, {"date": "2026-04-13", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 138.5}, {"date": "2026-04-13", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 138.5}, {"date": "2026-04-13", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 141}, {"date": "2026-04-13", "type": "sell", "code": "3689", "name": "湧德", "shares": 2000, "price": 138}, {"date": "2026-04-20", "type": "buy", "code": "3689", "name": "湧德", "shares": 10000, "price": 136}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 2000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-20", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 137}, {"date": "2026-04-23", "type": "buy", "code": "3689", "name": "湧德", "shares": 10000, "price": 136}, {"date": "2026-04-23", "type": "buy", "code": "3689", "name": "湧德", "shares": 5000, "price": 129}, {"date": "2026-04-23", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 127}, {"date": "2026-04-23", "type": "buy", "code": "3689", "name": "湧德", "shares": 3000, "price": 127}, {"date": "2026-04-24", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 133.5}, {"date": "2026-04-24", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 133.5}, {"date": "2026-04-24", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 133.5}, {"date": "2026-04-24", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 133.5}, {"date": "2026-04-24", "type": "sell", "code": "3689", "name": "湧德", "shares": 2000, "price": 131.5}, {"date": "2026-04-30", "type": "sell", "code": "3689", "name": "湧德", "shares": 12000, "price": 137}, {"date": "2026-04-30", "type": "sell", "code": "3689", "name": "湧德", "shares": 10000, "price": 134.5}, {"date": "2026-04-30", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 134.5}, {"date": "2026-05-06", "type": "buy", "code": "3689", "name": "湧德", "shares": 6000, "price": 138.5}, {"date": "2026-05-06", "type": "buy", "code": "3689", "name": "湧德", "shares": 3000, "price": 138.5}, {"date": "2026-05-06", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 138.5}, {"date": "2026-05-06", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 137.5}, {"date": "2026-05-06", "type": "buy", "code": "3689", "name": "湧德", "shares": 8000, "price": 137.5}, {"date": "2026-05-06", "type": "sell", "code": "3689", "name": "湧德", "shares": 6000, "price": 140.5}, {"date": "2026-05-06", "type": "sell", "code": "3689", "name": "湧德", "shares": 11000, "price": 140.5}, {"date": "2026-05-06", "type": "sell", "code": "3689", "name": "湧德", "shares": 3000, "price": 140.5}, {"date": "2026-05-07", "type": "buy", "code": "3689", "name": "湧德", "shares": 10000, "price": 130}, {"date": "2026-05-07", "type": "buy", "code": "3689", "name": "湧德", "shares": 10000, "price": 131.5}, {"date": "2026-05-07", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 128}, {"date": "2026-05-07", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 128}, {"date": "2026-05-14", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 123}, {"date": "2026-05-14", "type": "buy", "code": "3689", "name": "湧德", "shares": 2000, "price": 123}, {"date": "2026-05-14", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 123}, {"date": "2026-05-14", "type": "buy", "code": "3689", "name": "湧德", "shares": 4000, "price": 123}, {"date": "2026-05-14", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 123}, {"date": "2026-05-14", "type": "sell", "code": "3689", "name": "湧德", "shares": 9000, "price": 123}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 5000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 3000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 1000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 4000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 2000, "price": 140.5}, {"date": "2026-06-04", "type": "sell", "code": "3689", "name": "湧德", "shares": 2000, "price": 140.5}, {"date": "2026-06-04", "type": "buy", "code": "2303", "name": "聯電", "shares": 8000, "price": 126}, {"date": "2026-06-04", "type": "buy", "code": "2303", "name": "聯電", "shares": 2000, "price": 126}, {"date": "2026-06-04", "type": "buy", "code": "2317", "name": "鴻海", "shares": 3000, "price": 298.5}, {"date": "2026-06-04", "type": "buy", "code": "2317", "name": "鴻海", "shares": 2000, "price": 298.5}, {"date": "2026-06-05", "type": "sell", "code": "2303", "name": "聯電", "shares": 5000, "price": 128}, {"date": "2026-06-05", "type": "sell", "code": "2303", "name": "聯電", "shares": 5000, "price": 128}, {"date": "2026-06-08", "type": "buy", "code": "2344", "name": "華邦電", "shares": 8000, "price": 155}, {"date": "2026-06-08", "type": "buy", "code": "2303", "name": "聯電", "shares": 5000, "price": 121}, {"date": "2026-06-09", "type": "sell", "code": "2303", "name": "聯電", "shares": 3000, "price": 130}, {"date": "2026-06-09", "type": "sell", "code": "2303", "name": "聯電", "shares": 1000, "price": 130}, {"date": "2026-06-09", "type": "sell", "code": "2303", "name": "聯電", "shares": 1000, "price": 130}, {"date": "2026-06-10", "type": "buy", "code": "3689", "name": "湧德", "shares": 1000, "price": 123.5}, {"date": "2026-06-10", "type": "buy", "code": "3689", "name": "湧德", "shares": 4000, "price": 123.5}, {"date": "2026-06-12", "type": "sell", "code": "2344", "name": "華邦電", "shares": 8000, "price": 171.5}, {"date": "2026-06-12", "type": "buy", "code": "3689", "name": "湧德", "shares": 11000, "price": 116.5}, {"date": "2026-06-15", "type": "buy", "code": "2303", "name": "聯電", "shares": 5000, "price": 142}, {"date": "2026-06-15", "type": "sell", "code": "2303", "name": "聯電", "shares": 5000, "price": 142}, {"date": "2026-06-16", "type": "buy", "code": "2344", "name": "華邦電", "shares": 5000, "price": 197}, {"date": "2026-06-16", "type": "sell", "code": "2344", "name": "華邦電", "shares": 5000, "price": 196.5}, {"date": "2026-06-18", "type": "buy", "code": "2344", "name": "華邦電", "shares": 8000, "price": 203}, {"date": "2026-06-18", "type": "buy", "code": "2344", "name": "華邦電", "shares": 2000, "price": 203}, {"date": "2026-06-18", "type": "buy", "code": "2344", "name": "華邦電", "shares": 3000, "price": 210.5}, {"date": "2026-06-18", "type": "buy", "code": "2344", "name": "華邦電", "shares": 1000, "price": 210.5}, {"date": "2026-06-18", "type": "buy", "code": "2344", "name": "華邦電", "shares": 1000, "price": 210.5}, {"date": "2026-06-18", "type": "buy", "code": "2344", "name": "華邦電", "shares": 5000, "price": 210.5}, {"date": "2026-06-18", "type": "sell", "code": "2344", "name": "華邦電", "shares": 12000, "price": 214.5}, {"date": "2026-06-18", "type": "sell", "code": "2344", "name": "華邦電", "shares": 8000, "price": 218.5}, {"date": "2026-06-22", "type": "buy", "code": "2344", "name": "華邦電", "shares": 10000, "price": 224}, {"date": "2026-06-22", "type": "buy", "code": "2344", "name": "華邦電", "shares": 10000, "price": 231}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 1000, "price": 220}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 5000, "price": 220}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 1000, "price": 220}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 2000, "price": 220}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 1000, "price": 220}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 1000, "price": 220}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 1000, "price": 220}, {"date": "2026-06-22", "type": "sell", "code": "2344", "name": "華邦電", "shares": 1000, "price": 220}, {"date": "2026-06-23", "type": "buy", "code": "2303", "name": "聯電", "shares": 5000, "price": 171}, {"date": "2026-06-23", "type": "buy", "code": "2303", "name": "聯電", "shares": 1000, "price": 171}, {"date": "2026-06-23", "type": "sell", "code": "2303", "name": "聯電", "shares": 5000, "price": 174}, {"date": "2026-06-23", "type": "sell", "code": "2303", "name": "聯電", "shares": 1000, "price": 174}, {"date": "2026-06-23", "type": "buy", "code": "2344", "name": "華邦電", "shares": 5000, "price": 216.5}, {"date": "2026-06-23", "type": "buy", "code": "2344", "name": "華邦電", "shares": 5000, "price": 211.5}, {"date": "2026-06-23", "type": "buy", "code": "2344", "name": "華邦電", "shares": 1000, "price": 211.5}, {"date": "2026-06-23", "type": "sell", "code": "3689", "name": "湧德", "shares": 5000, "price": 118}, {"date": "2026-06-23", "type": "sell", "code": "2344", "name": "華邦電", "shares": 8000, "price": 208}, {"date": "2026-06-24", "type": "buy", "code": "2344", "name": "華邦電", "shares": 5000, "price": 210}];
+const DEFAULT = {
+  transactions: DEFAULT_TX,
+  otherHoldings: [{code:'3689',name:'湧德',account:'其他銀行',shares:4000,avgCost:121.5}],
+  prices: {'2317':255.5,'3689':117.5,'2344':219},
+  pledged: {'2317':5,'3689':11,'2344':7},
+  loan:2450000, limit:2500000, callRatio:130,
+  dividends: [], mrHistory: [],
+  markets: {'2317':'tse','2344':'tse','3689':'otc'},
+  upcomingDiv: [
+    {date:'2026-07-02', code:'2317', name:'鴻海', perShare:7.171, confirmed:true},
+    {date:'2026-08-01', code:'3689', name:'湧德', perShare:2.922, confirmed:false}
+  ],
+  monCfg: {atrMul:2.5, retr:8, maxLoss:50000},
+  peaks: {},          // 各檔波段最高（可手動）
+  prevClose: {},      // 昨收（算當日損益用）
+  market: {twii:null, twiiChg:null, txf:null, txfChg:null}
+};
+const KEY='invSystemData_v1';
+let D = load();
+let sim = {};
+
+function load(){ try{const s=localStorage.getItem(KEY); if(s) return JSON.parse(s);}catch(e){} return JSON.parse(JSON.stringify(DEFAULT)); }
+function save(){ localStorage.setItem(KEY, JSON.stringify(D)); }
+function fmt(n,d=0){ if(n===null||n===undefined||isNaN(n))return '—'; return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function signCls(n){ return n>0?'up':(n<0?'down':''); }
+function signTxt(n,d=0){ return (n>0?'+':'')+fmt(n,d); }
+
+// ---- 核心運算引擎（單一資料源）----
+function compute(priceOverride){
+  const px = priceOverride || D.prices;
+  // 移動平均：由舊到新
+  const tx=[...D.transactions].sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:0);
+  const qty={},cost={},name={},realized={};
+  for(const t of tx){
+    name[t.code]=t.name;
+    qty[t.code]=qty[t.code]||0; cost[t.code]=cost[t.code]||0; realized[t.code]=realized[t.code]||0;
+    if(t.type==='buy'){ qty[t.code]+=t.shares; cost[t.code]+=t.shares*t.price; }
+    else{
+      const avg = qty[t.code]>0? cost[t.code]/qty[t.code] : 0;
+      const s=Math.min(t.shares,qty[t.code]);
+      realized[t.code]+= (t.price-avg)*s;
+      cost[t.code]-=avg*s; qty[t.code]-=s;
+    }
+  }
+  const holds=[];
+  let totMV=0,totCost=0,totUnreal=0,totReal=0;
+  for(const c in qty){
+    if(qty[c]<=0){ totReal+=realized[c]||0; continue; }
+    const avg=cost[c]/qty[c], pr=px[c]||0, mv=qty[c]*pr, ic=cost[c], un=mv-ic;
+    holds.push({code:c,name:name[c],account:'兆豐',shares:qty[c],avg,price:pr,cost:ic,mv,unreal:un,broker:true});
+    totMV+=mv;totCost+=ic;totUnreal+=un;totReal+=realized[c]||0;
+  }
+  for(const o of D.otherHoldings){
+    const pr=px[o.code]||0, mv=o.shares*pr, ic=o.shares*o.avgCost, un=mv-ic;
+    holds.push({code:o.code,name:o.name,account:o.account,shares:o.shares,avg:o.avgCost,price:pr,cost:ic,mv,unreal:un,broker:false});
+    totMV+=mv;totCost+=ic;totUnreal+=un;
+  }
+  // 股利：依除息日回推當時持股，或用實收金額覆蓋
+  const divByCode={}; let totDiv=0;
+  for(const dv of (D.dividends||[])){
+    let amt;
+    if(dv.received!==undefined && dv.received!=='' && dv.received!==null){ amt=+dv.received; }
+    else if(dv.type==='stock'){ amt=0; }
+    else { amt = sharesAt(dv.date, dv.code) * (+dv.perShare||0); }
+    divByCode[dv.code]=(divByCode[dv.code]||0)+amt; totDiv+=amt;
+  }
+  // 把股利併進持股的還原成本
+  for(const h of holds){
+    h.div = divByCode[h.code]? divByCode[h.code]*(h.shares/(totSharesOf(h.code,holds)||h.shares)) : 0;
+    h.effCost = h.cost - h.div;
+    h.effAvg = h.shares? h.effCost/h.shares : 0;
+  }
+  // 質押擔保品市值
+  let collat=0;
+  for(const c in D.pledged){ collat += (D.pledged[c]||0)*1000*(px[c]||0); }
+  const loan=D.loan||0;
+  const mr = loan>0? collat/loan*100 : Infinity;
+  const equity=totMV-loan;
+  const lev= equity!==0? totMV/equity : 0;
+  const totWithDiv = totUnreal+totReal+totDiv;
+  return {holds,totMV,totCost,totUnreal,totReal,totDiv,totWithDiv,collat,loan,mr,equity,lev,qty,px,divByCode};
+}
+// 把某代碼的全部持股股數加總（兆豐＋其他帳戶），用來分攤股利
+function totSharesOf(code,holds){ return holds.filter(h=>h.code===code).reduce((s,h)=>s+h.shares,0); }
+// 回推某日（含）持有的某代碼股數（兆豐交易回放＋其他帳戶現有）
+function sharesAt(date,code){
+  const tx=[...D.transactions].filter(t=>t.code===code && t.date<=date).sort((a,b)=>a.date<b.date?-1:1);
+  let q=0; for(const t of tx){ q += t.type==='buy'? t.shares : -t.shares; }
+  for(const o of D.otherHoldings){ if(o.code===code) q+=o.shares; }
+  return Math.max(0,q);
+}
+
+// ---- 渲染 ----
+function mrColor(mr){ const call=D.callRatio||130; if(mr>=call+30)return 'var(--down)'; if(mr>=call+10)return 'var(--amber)'; return 'var(--danger)'; }
+function mrStatus(mr){ const call=D.callRatio||130; if(mr>=call+30)return '安全'; if(mr>=call+10)return '注意'; return '接近追繳'; }
+
+function render(){
+  const r=compute();
+  document.getElementById('c_mv').textContent=fmt(r.totMV);
+  document.getElementById('c_eq').textContent=fmt(r.equity);
+  document.getElementById('c_lev').textContent=r.lev.toFixed(2)+'倍';
+  const un=document.getElementById('c_unreal'); un.textContent=signTxt(r.totUnreal); un.className='val num '+signCls(r.totUnreal);
+  document.getElementById('c_unreal_pct').textContent= r.totCost? '報酬率 '+signTxt(r.totUnreal/r.totCost*100,2)+'%':'—';
+  const re=document.getElementById('c_real'); re.textContent=signTxt(r.totReal); re.className='val num '+signCls(r.totReal);
+  const dv=document.getElementById('c_div'); dv.textContent=fmt(r.totDiv); dv.className='val num '+(r.totDiv>0?'up':'');
+  const wd=document.getElementById('c_withdiv'); wd.textContent='含息總損益 '+signTxt(r.totWithDiv); wd.className='note '+signCls(r.totWithDiv);
+
+  const mr=r.mr; const col=mrColor(mr);
+  document.getElementById('c_mr').textContent= isFinite(mr)? mr.toFixed(1)+'%':'無借款';
+  document.getElementById('c_mr').style.color=col;
+  document.getElementById('dot').style.background=col;
+  document.getElementById('c_mr_status').textContent= isFinite(mr)? mrStatus(mr):'';
+  const call=D.callRatio||130;
+  document.getElementById('callmark').textContent='追繳 '+call+'%';
+  const pct=Math.max(0,Math.min(100,(mr-call)/(250-call)*100));
+  const g=document.getElementById('gfill'); g.style.width=isFinite(mr)?pct+'%':'100%'; g.style.background=col;
+
+  // banner
+  const b=document.getElementById('riskBanner');
+  if(!isFinite(mr)){ b.className='banner safe'; b.textContent='目前無借款，無斷頭風險。'; }
+  else if(mr>=call+30){ b.className='banner safe'; b.innerHTML='維持率 '+mr.toFixed(1)+'%，安全。擔保品再跌約 '+((1-call/mr)*100).toFixed(1)+'% 才會觸及追繳線。'; }
+  else if(mr>=call+10){ b.className='banner warn'; b.innerHTML='⚠ 維持率 '+mr.toFixed(1)+'%，緩衝縮小。擔保品再跌約 '+((1-call/mr)*100).toFixed(1)+'% 就會觸及追繳，盯緊高波動檔。'; }
+  else{ b.className='banner danger'; b.innerHTML='🔴 維持率 '+mr.toFixed(1)+'%，接近追繳線（'+call+'%）！擔保品僅剩約 '+((1-call/mr)*100).toFixed(1)+'% 緩衝，預備補擔保品或降槓桿。'; }
+
+  // holds table
+  const tb=document.querySelector('#holdTable tbody'); tb.innerHTML='';
+  r.holds.sort((a,b)=>b.mv-a.mv);
+  for(const h of r.holds){
+    const rr=h.cost? h.unreal/h.cost*100:0;
+    const withDiv=h.unreal+(h.div||0);
+    const rrd=h.cost? withDiv/h.cost*100:0;
+    const effShow = (h.div>0)? fmt(h.effAvg,2) : '—';
+    tb.innerHTML+=`<tr><td>${h.name} <span class="tag">${h.code}</span></td><td style="text-align:left;color:var(--muted)">${h.account}</td>
+    <td class="num">${fmt(h.shares)}</td><td class="num">${fmt(h.avg,2)}</td><td class="num" style="color:${h.div>0?'var(--up)':'var(--dim)'}">${effShow}</td><td class="num">${fmt(h.price,2)}</td>
+    <td class="num">${fmt(h.cost)}</td><td class="num">${fmt(h.mv)}</td>
+    <td class="num ${signCls(h.unreal)}">${signTxt(h.unreal)}</td><td class="num ${signCls(rr)}">${signTxt(rr,1)}%</td>
+    <td class="num ${signCls(rrd)}">${signTxt(rrd,1)}%</td></tr>`;
+  }
+  const tf=document.querySelector('#holdTable tfoot');
+  const totWithDivUn=r.totUnreal+r.totDiv;
+  tf.innerHTML=`<tr style="font-weight:700"><td>合計</td><td></td><td></td><td></td><td></td><td></td>
+   <td class="num">${fmt(r.totCost)}</td><td class="num">${fmt(r.totMV)}</td>
+   <td class="num ${signCls(r.totUnreal)}">${signTxt(r.totUnreal)}</td>
+   <td class="num ${signCls(r.totUnreal)}">${signTxt(r.totCost? r.totUnreal/r.totCost*100:0,1)}%</td>
+   <td class="num ${signCls(totWithDivUn)}">${signTxt(r.totCost? totWithDivUn/r.totCost*100:0,1)}%</td></tr>`;
+
+  renderRisk(r);
+}
+
+function renderRisk(r){
+  // sensitivity table
+  const codes=Object.keys(r.qty).filter(c=>r.qty[c]>0).concat(D.otherHoldings.map(o=>o.code));
+  const uniq=[...new Set(codes)];
+  const steps=[-0.2,-0.1,-0.05,0,0.05,0.1,0.2];
+  const stb=document.querySelector('#sensTable tbody'); stb.innerHTML='';
+  // per-stock rows: unrealized total when ONLY that stock moves
+  for(const c of uniq){
+    let row=`<tr><td>${(r.holds.find(h=>h.code===c)||{}).name||c} <span class="tag">${c}</span></td>`;
+    for(const s of steps){
+      const ov={...r.px}; ov[c]=r.px[c]*(1+s);
+      const rr=compute(ov);
+      row+=`<td class="num ${signCls(rr.totUnreal)}">${signTxt(rr.totUnreal)}</td>`;
+    }
+    row+='</tr>'; stb.innerHTML+=row;
+  }
+  // maintenance ratio row (all move together)
+  let mrow=`<tr style="border-top:2px solid var(--line)"><td>整戶維持率<br><span style="color:var(--dim);font-size:11px">(全檔同步漲跌)</span></td>`;
+  for(const s of steps){
+    const ov={}; for(const c in r.px) ov[c]=r.px[c]*(1+s);
+    const rr=compute(ov);
+    mrow+=`<td class="num" style="color:${mrColor(rr.mr)}">${isFinite(rr.mr)?rr.mr.toFixed(0)+'%':'—'}</td>`;
+  }
+  mrow+='</tr>'; stb.innerHTML+=mrow;
+
+  // call distance table
+  const call=D.callRatio||130, loan=r.loan;
+  const ctb=document.querySelector('#callTable tbody'); ctb.innerHTML='';
+  // base collateral
+  for(const c in D.pledged){
+    const sh=(D.pledged[c]||0)*1000; if(sh<=0)continue;
+    const pr=r.px[c]; const nm=(r.holds.find(h=>h.code===c)||{}).name||c;
+    // others collateral fixed
+    let others=0; for(const k in D.pledged){ if(k!==c) others+=(D.pledged[k]||0)*1000*r.px[k]; }
+    // need: (others + sh*P)/loan = call/100  => P = (call/100*loan - others)/sh
+    const callP=(call/100*loan - others)/sh;
+    const drop= callP>0? (1-callP/pr)*100 : 100;
+    // all proportional: (collat*k)/loan=call/100 => k=call/100*loan/collat
+    const k=call/100*loan/r.collat;
+    const allDrop=(1-k)*100;
+    ctb.innerHTML+=`<tr><td>${nm} <span class="tag">${c}</span></td><td class="num">${fmt(pr,2)}</td>
+      <td class="num">${callP>0?fmt(callP,2):'—'}</td>
+      <td class="num ${callP>0&&drop>0?'down':''}">${callP>0?'−'+drop.toFixed(1)+'%':'已低於'}</td>
+      <td class="num down">${allDrop>0?'−'+allDrop.toFixed(1)+'%':'已觸及'}</td></tr>`;
+  }
+
+  buildSim(r);
+}
+
+// ---- 情境模擬器 ----
+function buildSim(r){
+  const grid=document.getElementById('simGrid');
+  const codes=[...new Set(r.holds.map(h=>h.code))];
+  if(Object.keys(sim).length===0) codes.forEach(c=>sim[c]=0);
+  grid.innerHTML='';
+  for(const c of codes){
+    const nm=(r.holds.find(h=>h.code===c)||{}).name||c;
+    grid.innerHTML+=`<div class="simbox"><div class="nm">${nm} <span class="tag">${c}</span></div>
+      <input type="range" min="-30" max="30" step="0.5" value="${sim[c]||0}" oninput="onSim('${c}',this.value)">
+      <div class="simval"><span>現價 ${fmt(r.px[c],2)}</span><span id="sv_${c}">${sim[c]>0?'+':''}${sim[c]||0}% → ${fmt(r.px[c]*(1+(sim[c]||0)/100),2)}</span></div></div>`;
+  }
+  runSim();
+}
+function onSim(c,v){ sim[c]=parseFloat(v); const r=compute(); document.getElementById('sv_'+c).textContent=(v>0?'+':'')+v+'% → '+fmt(r.px[c]*(1+v/100),2); runSim(); }
+function resetSim(){ for(const c in sim) sim[c]=0; render(); }
+function runSim(){
+  const base=compute();
+  const ov={...base.px};
+  for(const c in sim){ ov[c]=base.px[c]*(1+(sim[c]||0)/100); }
+  const r=compute(ov);
+  document.getElementById('s_mv').textContent=fmt(r.totMV);
+  const eq=document.getElementById('s_eq'); eq.textContent=fmt(r.equity); eq.className='val num '+(r.equity<base.equity?'down':r.equity>base.equity?'up':'');
+  const mr=document.getElementById('s_mr'); mr.textContent=isFinite(r.mr)?r.mr.toFixed(1)+'%':'—'; mr.style.color=mrColor(r.mr);
+  const pnl=document.getElementById('s_pnl'); const tot=r.totUnreal+r.totReal; pnl.textContent=signTxt(tot); pnl.className='val num '+signCls(tot);
+}
+
+// ---- 各分頁表格 ----
+function renderTx(){
+  const tb=document.querySelector('#txTable tbody'); tb.innerHTML='';
+  const tx=[...D.transactions].map((t,i)=>({...t,_i:i})).sort((a,b)=> a.date<b.date?1:-1);
+  document.getElementById('txcount').textContent='共 '+D.transactions.length+' 筆';
+  for(const t of tx){
+    tb.innerHTML+=`<tr><td>${t.date}</td><td class="${t.type==='buy'?'up':'down'}">${t.type==='buy'?'買':'賣'}</td>
+    <td class="code">${t.code}</td><td>${t.name}</td><td class="num">${fmt(t.shares)}</td><td class="num">${fmt(t.price,2)}</td>
+    <td class="num">${fmt(t.shares*t.price)}</td><td><button class="del tiny" onclick="delTx(${t._i})">刪</button></td></tr>`;
+  }
+}
+function renderOther(){
+  const tb=document.querySelector('#otherTable tbody'); tb.innerHTML='';
+  D.otherHoldings.forEach((o,i)=>{ tb.innerHTML+=`<tr><td class="code">${o.code}</td><td>${o.name}</td><td style="text-align:left">${o.account}</td>
+    <td class="num">${fmt(o.shares)}</td><td class="num">${fmt(o.avgCost,2)}</td><td><button class="del tiny" onclick="delOther(${i})">刪</button></td></tr>`; });
+  if(!D.otherHoldings.length) tb.innerHTML='<tr><td colspan="6" class="empty">尚無其他帳戶持股</td></tr>';
+}
+function renderSettings(){
+  // gather all codes
+  const r=compute();
+  const codes=[...new Set([...r.holds.map(h=>h.code),...Object.keys(D.prices)])];
+  const pt=document.querySelector('#priceTable tbody'); pt.innerHTML='';
+  const pl=document.querySelector('#pledgeTable tbody'); pl.innerHTML='';
+  for(const c of codes){
+    const nm=(r.holds.find(h=>h.code===c)||{}).name||'';
+    pt.innerHTML+=`<tr><td class="code">${c}</td><td>${nm}</td>
+      <td><select onchange="setMarket('${c}',this.value)" style="width:auto">
+        <option value="tse" ${(D.markets&&D.markets[c]==='otc')?'':'selected'}>上市</option>
+        <option value="otc" ${(D.markets&&D.markets[c]==='otc')?'selected':''}>上櫃</option>
+      </select></td>
+      <td><input class="num" type="number" step="0.01" value="${D.prices[c]||''}" onchange="setPrice('${c}',this.value)"></td></tr>`;
+    const brokerSh=(r.qty[c]||0);
+    pl.innerHTML+=`<tr><td class="code">${c}</td><td>${nm}</td><td class="num">${fmt(brokerSh/1000,0)} 張</td>
+      <td><input class="num" type="number" value="${D.pledged[c]||0}" onchange="setPledge('${c}',this.value)"></td></tr>`;
+  }
+  document.getElementById('set_loan').value=D.loan;
+  document.getElementById('set_limit').value=D.limit;
+  document.getElementById('set_call').value=D.callRatio;
+}
+
+// ---- 操作 ----
+function addTx(){
+  const t={date:document.getElementById('tx_date').value||new Date().toISOString().slice(0,10),
+    type:document.getElementById('tx_type').value, code:document.getElementById('tx_code').value.trim(),
+    name:document.getElementById('tx_name').value.trim(), shares:+document.getElementById('tx_shares').value,
+    price:+document.getElementById('tx_price').value};
+  if(!t.code||!t.shares||!t.price){alert('請填代碼、股數、成交價');return;}
+  if(!t.name) t.name=t.code;
+  if(D.prices[t.code]===undefined) D.prices[t.code]=t.price;
+  D.transactions.push(t); save(); ['tx_code','tx_name','tx_shares','tx_price'].forEach(id=>document.getElementById(id).value='');
+  renderAll();
+}
+function delTx(i){ if(confirm('刪除這筆交易？')){ D.transactions.splice(i,1); save(); renderAll(); } }
+function addOther(){
+  const o={code:document.getElementById('oh_code').value.trim(),name:document.getElementById('oh_name').value.trim()||document.getElementById('oh_code').value.trim(),
+    account:document.getElementById('oh_acc').value.trim()||'其他',shares:+document.getElementById('oh_shares').value,avgCost:+document.getElementById('oh_cost').value};
+  if(!o.code||!o.shares||!o.avgCost){alert('請填代碼、股數、成本');return;}
+  if(D.prices[o.code]===undefined) D.prices[o.code]=o.avgCost;
+  D.otherHoldings.push(o); save(); ['oh_code','oh_name','oh_acc','oh_shares','oh_cost'].forEach(id=>document.getElementById(id).value=''); renderAll();
+}
+function delOther(i){ D.otherHoldings.splice(i,1); save(); renderAll(); }
+function setPrice(c,v){ D.prices[c]=+v; save(); renderAll(); }
+
+// ---- 線上刷新股價（A 版：能抓就抓，抓不到不影響手動）----
+const OTC_CODES = ['3689']; // 後備：若無 markets 設定時的預設上櫃清單
+function marketOf(c){ if(D.markets && D.markets[c]) return D.markets[c]; return OTC_CODES.includes(c)?'otc':'tse'; }
+function setMarket(c,v){ D.markets=D.markets||{}; D.markets[c]=v; save(); }
+function showToast(msg,color){
+  let t=document.getElementById('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast';
+    t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:90%;z-index:9999;padding:12px 18px;border-radius:10px;font-size:13px;background:#1c2430;border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.5);transition:opacity .3s';
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.color=color||'var(--txt)'; t.style.borderColor=color||'var(--line)'; t.style.opacity='1';
+  clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity='0'; }, 6000);
+}
+function setFetchStatus(msg,color){
+  ['fetchStatus'].forEach(id=>{ const e=document.getElementById(id); if(e){e.textContent=msg; e.style.color=color||'var(--muted)';} });
+  showToast(msg,color);
+}
+function setFetchBusy(b){
+  ['fetchBtn','fetchBtn2'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.disabled=b; e.style.opacity=b?0.6:1; if(b)e.dataset.t=e.textContent, e.textContent='抓取中…'; else if(e.dataset.t)e.textContent=e.dataset.t; } });
+}
+function bust(url){ return url + (url.includes('?')?'&':'?') + '_=' + Date.now(); }
+async function fetchPrices(){
+  // 收集系統內所有代碼
+  const codes=[...new Set([...Object.keys(D.prices), ...D.transactions.map(t=>t.code), ...D.otherHoldings.map(o=>o.code)])];
+  if(!codes.length){ setFetchStatus('沒有可更新的代碼','var(--amber)'); return; }
+  setFetchBusy(true); setFetchStatus('連線中…');
+  // 依市場別抓一批，回傳 {成功代碼:價格}
+  async function grab(list){
+    if(!list.length) return {};
+    const exch = list.map(x=> x.mk+'_'+x.c+'.tw').join('|');
+    const target = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch='+encodeURIComponent(exch);
+    const j = await tryFetch(proxied(target), vMis);
+    if(!j) return null;
+    const got={};
+    for(const m of j.msgArray){
+      let p = parseFloat(m.z);
+      if(isNaN(p)||m.z==='-'){ const b=parseFloat((m.b||'').split('_')[0]); const a=parseFloat((m.a||'').split('_')[0]); p = !isNaN(b)?b : !isNaN(a)?a : parseFloat(m.y); }
+      if(!isNaN(p) && p>0) got[m.c]=p;
+    }
+    return got;
+  }
+  // 第一輪：照目前設定的市場別
+  const first = await grab(codes.map(c=>({c, mk:marketOf(c)})));
+  if(first===null){
+    setFetchBusy(false);
+    setFetchStatus('⚠ 線上抓取失敗（CORS 或代理逾時）。請手動輸入，或稍後再試。','var(--amber)');
+    return;
+  }
+  let ok=0, fixed=[];
+  for(const c in first){ D.prices[c]=first[c]; ok++; }
+  // 第二輪：第一輪沒抓到的，自動換另一個市場別重試（自我修正設定錯誤）
+  let miss = codes.filter(c=> first[c]===undefined);
+  if(miss.length){
+    D.markets = D.markets || {};
+    const retry = await grab(miss.map(c=>({c, mk: marketOf(c)==='otc'?'tse':'otc'})));
+    if(retry){
+      for(const c in retry){
+        D.prices[c]=retry[c]; ok++; fixed.push(c);
+        D.markets[c] = marketOf(c)==='otc'?'tse':'otc';   // 記住正確的市場別
+      }
+      miss = miss.filter(c=> retry[c]===undefined);
+    }
+  }
+  save(); renderAll();
+  const now=new Date().toTimeString().slice(0,8);
+  let msg=`✓ 線上更新 ${now} 已更新 ${ok} 檔`;
+  if(fixed.length) msg+=`；已自動修正市場別：${fixed.join('、')}`;
+  if(miss.length) msg+=`；仍無報價：${miss.join('、')}（可能停牌或代碼有誤，請手動填）`;
+  setFetchBusy(false);
+  setFetchStatus(msg, ok?'var(--down)':'var(--amber)');
+}
+
+// ---- 股利 ----
+function addDiv(){
+  const d={date:document.getElementById('dv_date').value, code:document.getElementById('dv_code').value.trim(),
+    name:document.getElementById('dv_name').value.trim(), perShare:+document.getElementById('dv_per').value, type:'cash'};
+  const rv=document.getElementById('dv_recv').value; if(rv!=='') d.received=+rv;
+  if(!d.date||!d.code||(!d.perShare && d.received===undefined)){alert('請填除息日、代碼，以及每股股利或實收金額');return;}
+  if(!d.name) d.name=d.code;
+  D.dividends=D.dividends||[]; D.dividends.push(d); save();
+  ['dv_code','dv_name','dv_per','dv_recv'].forEach(id=>document.getElementById(id).value=''); renderAll();
+}
+function delDiv(i){ D.dividends.splice(i,1); save(); renderAll(); }
+function renderDiv(){
+  const r=compute();
+  const tb=document.querySelector('#divTable tbody'); tb.innerHTML='';
+  const ds=(D.dividends||[]).map((d,i)=>({...d,_i:i})).sort((a,b)=>a.date<b.date?1:-1);
+  let tot=0;
+  for(const d of ds){
+    const sh = (d.received!==undefined&&d.received!=='')? '—' : fmt(sharesAt(d.date,d.code));
+    const amt = (d.received!==undefined&&d.received!=='')? +d.received : sharesAt(d.date,d.code)*(+d.perShare||0);
+    tot+=amt;
+    tb.innerHTML+=`<tr><td>${d.date}</td><td class="code">${d.code}</td><td>${d.name||''}</td>
+      <td class="num">${d.perShare?fmt(d.perShare,3):'—'}</td><td class="num">${sh}</td>
+      <td class="num up">${fmt(amt)}</td><td><button class="del tiny" onclick="delDiv(${d._i})">刪</button></td></tr>`;
+  }
+  if(!ds.length) tb.innerHTML='<tr><td colspan="7" class="empty">尚無股利記錄。湧德約 8 月除息時記第一筆。</td></tr>';
+  const tf=document.querySelector('#divTable tfoot');
+  // 還原成本摘要
+  let summary='';
+  for(const h of r.holds){ if(h.div>0) summary+=`${h.name} 還原成本 ${fmt(h.effAvg,2)}（原 ${fmt(h.avg,2)}）　`; }
+  tf.innerHTML = ds.length? `<tr style="font-weight:700"><td colspan="5">累計已收股利</td><td class="num up">${fmt(tot)}</td><td></td></tr>`
+    + (summary?`<tr><td colspan="7" style="color:var(--muted);font-size:12px;text-align:left;font-weight:400">${summary}</td></tr>`:'') : '';
+}
+
+// ---- 維持率趨勢 ----
+function snapshot(manual){
+  const r=compute(); const today=new Date().toISOString().slice(0,10);
+  D.mrHistory=D.mrHistory||[];
+  const rec={date:today, mr:isFinite(r.mr)?+r.mr.toFixed(1):null, mv:Math.round(r.totMV), equity:Math.round(r.equity), unreal:Math.round(r.totUnreal)};
+  const ex=D.mrHistory.find(h=>h.date===today);
+  if(ex) Object.assign(ex,rec); else D.mrHistory.push(rec);
+  D.mrHistory.sort((a,b)=>a.date<b.date?-1:1);
+  save(); if(manual){ renderAll(); }
+}
+function clearHist(){ if(confirm('清空所有維持率趨勢記錄？')){ D.mrHistory=[]; save(); renderAll(); } }
+function drawMrChart(){
+  const box=document.getElementById('mrChart'); const h=(D.mrHistory||[]).filter(d=>d.mr!=null);
+  if(h.length<2){ box.innerHTML='<div class="empty">至少記錄兩天才會出現趨勢線。每天打開系統會自動記錄一次。</div>'; return; }
+  const call=D.callRatio||130;
+  const showMv = (document.getElementById('showMv')||{}).checked;
+  const W=900,H=300,pl=52,pr=showMv?60:16,pt=22,pb=46;
+  const mrs=h.map(d=>d.mr);
+  let lo=Math.min(call-10,...mrs), hi=Math.max(call+30,...mrs);
+  lo=Math.floor(lo/10)*10; hi=Math.ceil(hi/10)*10;
+  const x=i=> pl + (W-pl-pr)*(h.length===1?0.5:i/(h.length-1));
+  const y=v=> pt + (H-pt-pb)*(1-(v-lo)/(hi-lo));
+  const line=h.map((d,i)=>`${x(i).toFixed(1)},${y(d.mr).toFixed(1)}`).join(' ');
+  const area=`${x(0)},${y(lo)} ${line} ${x(h.length-1)},${y(lo)}`;
+  let grid=''; for(let v=lo; v<=hi; v+=20){ grid+=`<line x1="${pl}" y1="${y(v)}" x2="${W-pr}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-8}" y="${y(v)+4}" fill="var(--dim)" font-size="11" text-anchor="end" font-family="monospace">${v}%</text>`; }
+  const cy=y(call);
+  const step=Math.max(1,Math.ceil(h.length/8)); let xl='';
+  h.forEach((d,i)=>{ if(i%step===0||i===h.length-1){ xl+=`<text x="${x(i)}" y="${H-pb+18}" fill="var(--dim)" font-size="10" text-anchor="middle" font-family="monospace">${d.date.slice(5)}</text>`; }});
+  const pts=h.map((d,i)=>`<circle cx="${x(i)}" cy="${y(d.mr)}" r="3" fill="var(--blue)"/><title>${d.date} 維持率 ${d.mr}%</title>`).join('');
+  const last=h[h.length-1].mr; const lcol = last>=call+30?'var(--down)':last>=call+10?'var(--amber)':'var(--danger)';
+  // 市值線（右軸）
+  let mvLine='',mvAxis='',mvPts='',mvLegend='';
+  if(showMv){
+    const mvs=h.map(d=>d.mv||0); let mlo=Math.min(...mvs),mhi=Math.max(...mvs);
+    if(mlo===mhi){mlo*=0.98;mhi*=1.02;} const padm=(mhi-mlo)*0.1; mlo-=padm; mhi+=padm;
+    const ym=v=> pt + (H-pt-pb)*(1-(v-mlo)/(mhi-mlo));
+    mvLine=`<polyline points="${h.map((d,i)=>`${x(i).toFixed(1)},${ym(d.mv).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--amber)" stroke-width="2" stroke-dasharray="2 2"/>`;
+    mvPts=h.map((d,i)=>`<circle cx="${x(i)}" cy="${ym(d.mv)}" r="2.5" fill="var(--amber)"/><title>${d.date} 市值 ${(d.mv/10000).toFixed(1)}萬</title>`).join('');
+    for(let k=0;k<=3;k++){ const v=mlo+(mhi-mlo)*k/3; mvAxis+=`<text x="${W-pr+8}" y="${ym(v)+4}" fill="var(--amber)" font-size="10" text-anchor="start" font-family="monospace" opacity="0.8">${(v/10000).toFixed(0)}萬</text>`; }
+    mvLegend=`<rect x="${pl+96}" y="6" width="14" height="3" fill="var(--amber)"/><text x="${pl+114}" y="12" fill="var(--amber)" font-size="11">總市值(右軸)</text>`;
+  }
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%">
+    ${grid}
+    <rect x="${pl}" y="3" width="14" height="3" fill="var(--blue)"/><text x="${pl+18}" y="12" fill="var(--blue)" font-size="11">維持率(左軸)</text>
+    ${mvLegend}
+    <line x1="${pl}" y1="${cy}" x2="${W-pr}" y2="${cy}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="${W-pr}" y="${cy-6}" fill="var(--danger)" font-size="11" text-anchor="end">追繳 ${call}%</text>
+    <polygon points="${area}" fill="var(--blue)" opacity="0.08"/>
+    ${mvLine}
+    <polyline points="${line}" fill="none" stroke="var(--blue)" stroke-width="2"/>
+    ${pts}${mvPts}${mvAxis}${xl}
+    <text x="${x(h.length-1)}" y="${y(last)-10}" fill="${lcol}" font-size="13" text-anchor="end" font-family="monospace" font-weight="700">${last}%</text>
+  </svg>`;
+}
+// ---- 除息倒數 ----
+function addUpcoming(){
+  const u={date:document.getElementById('up_date').value, code:document.getElementById('up_code').value.trim(),
+    name:document.getElementById('up_name').value.trim(), perShare:+document.getElementById('up_per').value};
+  if(!u.date||!u.code){alert('請填除息日與代碼');return;}
+  if(!u.name) u.name=u.code;
+  D.upcomingDiv=D.upcomingDiv||[];
+  const ex=D.upcomingDiv.find(x=>x.code===u.code); if(ex) Object.assign(ex,u); else D.upcomingDiv.push(u);
+  save(); ['up_date','up_code','up_name','up_per'].forEach(id=>document.getElementById(id).value=''); renderAll();
+}
+function delUpcoming(i){ D.upcomingDiv.splice(i,1); save(); renderAll(); }
+
+// ---- 自動查除息預告（TWSE OpenAPI，通常允許 CORS；上櫃可能查不到，會標示）----
+async function fetchDividends(){
+  const codes=[...new Set([...D.transactions.map(t=>t.code), ...D.otherHoldings.map(o=>o.code)])];
+  if(!codes.length){ document.getElementById('divStatus').textContent='沒有持股可查'; return; }
+  const btn=document.getElementById('divBtn'); const st=document.getElementById('divStatus');
+  btn.disabled=true; btn.style.opacity=0.6; const ot=btn.textContent; btn.textContent='查詢中…'; st.style.color='var(--muted)'; st.textContent='連線證交所…';
+  // TWSE 除權息預告表（上市）
+  const src='https://openapi.twse.com.tw/v1/opendata/t187ap45_L';
+  const arr=await tryFetch(proxied(src), vArr);
+  if(!arr){ btn.disabled=false; btn.style.opacity=1; btn.textContent=ot;
+    st.style.color='var(--amber)'; st.textContent='⚠ 線上查詢失敗（CORS 或休市）。可手動填，或用 GitHub 版。'; return; }
+  // 嘗試從每筆找出 代碼/日期/現金股利 欄位（OpenAPI 欄名可能調整，做寬鬆比對）
+  function pick(obj,keys){ for(const k in obj){ for(const kk of keys){ if(k.includes(kk)) return obj[k]; } } return ''; }
+  let found=0, names=[];
+  D.upcomingDiv=D.upcomingDiv||[];
+  for(const c of codes){
+    const row=arr.find(o=> Object.values(o).some(v=> String(v).trim()===c));
+    if(!row) continue;
+    const rawDate=String(pick(row,['除權息交易日','除權息日','除息交易日','Date','date'])||'');
+    const cash=parseFloat(pick(row,['現金股利','息','Cash','cash'])||'')||0;
+    const nm=String(pick(row,['名稱','Name','name'])||c);
+    // 民國日期 1150702 -> 2026-07-02
+    let iso='';
+    const d=rawDate.replace(/\D/g,'');
+    if(d.length===7){ iso=(+d.slice(0,3)+1911)+'-'+d.slice(3,5)+'-'+d.slice(5,7); }
+    else if(d.length===8){ iso=d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8); }
+    if(!iso) continue;
+    const ex=D.upcomingDiv.find(x=>x.code===c);
+    const rec={date:iso,code:c,name:nm,perShare:cash,confirmed:true};
+    if(ex) Object.assign(ex,rec); else D.upcomingDiv.push(rec);
+    found++; names.push(nm);
+  }
+  save(); renderAll();
+  btn.disabled=false; btn.style.opacity=1; btn.textContent=ot;
+  if(found){ st.style.color='var(--down)'; st.textContent=`✓ 已更新 ${found} 檔：${names.join('、')}`; }
+  else { st.style.color='var(--amber)'; st.textContent='查到資料但無相符持股（上櫃如湧德此表通常查不到，請手動填）'; }
+}
+function renderUpcoming(){
+  const box=document.getElementById('upcomingList'); const list=(D.upcomingDiv||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+  if(!list.length){ box.innerHTML='<div class="empty">尚無排程。湧德通常 8 月除息，可先填預估日。</div>'; return; }
+  const today=new Date(); today.setHours(0,0,0,0);
+  let html='<div class="simgrid">';
+  list.forEach((u,i)=>{
+    const ex=new Date(u.date+'T00:00:00'); const days=Math.round((ex-today)/86400000);
+    const sh=sharesAt(u.date,u.code)||sharesAt(today.toISOString().slice(0,10),u.code);
+    const est=sh*(u.perShare||0);
+    let badge,bcol;
+    if(days>0){ badge=`還有 ${days} 天`; bcol='var(--blue)'; }
+    else if(days===0){ badge='今天除息'; bcol='var(--amber)'; }
+    else { badge=`已除息 ${-days} 天，記得補登`; bcol='var(--down)'; }
+    html+=`<div class="simbox"><div class="nm">${u.name} <span class="tag">${u.code}</span>
+      <button class="del tiny" style="float:right" onclick="delUpcoming(${i})">刪</button></div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:${bcol};margin:4px 0">${badge}</div>
+      <div class="simval"><span>${u.date}</span><span>每股 ${fmt(u.perShare,3)}</span></div>
+      <div class="simval"><span>預估持股 ${fmt(sh)}</span><span class="up">~${fmt(est)}</span></div></div>`;
+  });
+  html+='</div>';
+  box.innerHTML=html;
+}
+function setPledge(c,v){ D.pledged[c]=+v; save(); renderAll(); }
+function saveSettings(){ D.loan=+document.getElementById('set_loan').value; D.limit=+document.getElementById('set_limit').value; D.callRatio=+document.getElementById('set_call').value; save(); renderAll(); }
+
+function exportData(){ const blob=new Blob([JSON.stringify(D,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='投資系統備份_'+new Date().toISOString().slice(0,10)+'.json'; a.click(); }
+function importData(e){ const f=e.target.files[0]; if(!f)return; const rd=new FileReader();
+  rd.onload=()=>{ try{ D=JSON.parse(rd.result); save(); renderAll(); alert('匯入成功'); }catch(err){ alert('檔案格式錯誤'); } }; rd.readAsText(f); }
+function resetAll(){ if(confirm('回復成預設資料？目前資料會被覆蓋（建議先匯出備份）')){ D=JSON.parse(JSON.stringify(DEFAULT)); sim={}; save(); renderAll(); } }
+
+// ============ 盤勢指標（加權指數走證交所；台指期純手動）============
+function fetchOne(url, ms){
+  return new Promise((resolve)=>{
+    const ctrl=new AbortController();
+    const to=setTimeout(()=>{ try{ctrl.abort();}catch(e){} resolve(null); }, ms);
+    fetch(url,{signal:ctrl.signal,cache:'no-store'})
+      .then(r=> r.ok? r.text() : null)
+      .then(t=>{ clearTimeout(to); if(t==null){ resolve(null); return; } try{ resolve(JSON.parse(t)); }catch(e){ resolve(null); } })
+      .catch(()=>{ clearTimeout(to); resolve(null); });
+  });
+}
+// 同時發所有來源、誰先回傳「通過驗證」的結果就用誰；全域硬逾時，保證一定跳結果不卡住
+function tryFetch(urls, validate){
+  validate = validate || (j=> j!=null);
+  return new Promise((resolve)=>{
+    let done=false, pending=urls.length;
+    const finish=(v)=>{ if(!done){ done=true; clearTimeout(hard); resolve(v); } };
+    const hard=setTimeout(()=>finish(null), 7000);
+    urls.forEach(u=>{
+      fetchOne(u, 6500).then(j=>{
+        if(!done && j && validate(j)){ finish(j); }
+        else { pending--; if(pending<=0) finish(null); }
+      });
+    });
+  });
+}
+function proxied(url){ url=bust(url); return [url, 'https://api.allorigins.win/raw?url='+encodeURIComponent(url), 'https://corsproxy.io/?url='+encodeURIComponent(url)]; }
+const vMis = j=> j&&j.msgArray&&j.msgArray.length>0;
+const vDay = j=> j&&j.data&&j.data.length>0;
+const vArr = j=> Array.isArray(j)&&j.length>0;
+async function fetchMarket(){
+  const st=document.getElementById('mktStatus'); st.style.color='var(--muted)'; st.textContent='抓取中…';
+  // 加權指數 via 證交所 MIS（與刷新股價同一個能用的端點）
+  const url='https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=tse_t00.tw';
+  const j=await tryFetch(proxied(url), vMis);
+  let ok=false;
+  if(j&&j.msgArray&&j.msgArray.length){
+    const m=j.msgArray[0]; let z=parseFloat(m.z); if(isNaN(z)||m.z==='-') z=parseFloat(m.y);
+    const y=parseFloat(m.y);
+    if(!isNaN(z)){ D.market.twii=z; D.market.twiiChg=!isNaN(y)?(z-y):null; ok=true; }
+  }
+  save(); renderMarket();
+  if(ok){ st.style.color='var(--down)'; st.textContent='✓ 加權指數已更新 '+new Date().toTimeString().slice(0,5)+'（台指期請按右上「手動」）'; }
+  else { st.style.color='var(--amber)'; st.textContent='⚠ 加權指數抓取失敗，可稍後再試'; }
+}
+function renderMarket(){
+  const m=D.market||{};
+  document.getElementById('mkt_twii').textContent = m.twii? fmt(m.twii,0):'—';
+  const tc=document.getElementById('mkt_twii_chg');
+  if(m.twiiChg!=null){ tc.textContent=signTxt(m.twiiChg,0)+' ('+signTxt(m.twii?m.twiiChg/(m.twii-m.twiiChg)*100:0,2)+'%)'; tc.className='note '+signCls(m.twiiChg); }
+  else tc.textContent='—';
+  document.getElementById('mkt_txf').textContent = m.txf? fmt(m.txf,0):'—';
+  const fc=document.getElementById('mkt_txf_chg');
+  if(m.txfChg!=null){ fc.textContent=signTxt(m.txfChg,0)+'　夜盤'; fc.className='note '+signCls(m.txfChg); }
+  else fc.textContent='夜盤 15:00–05:00（手動填）';
+}
+function editTxf(){
+  const v=prompt('輸入台指期夜盤點數（例 23150）：', D.market.txf||'');
+  if(v===null) return; const n=parseFloat(v); if(isNaN(n)) return;
+  const c=prompt('漲跌點數（例 120 或 -80，可空）：', D.market.txfChg||'');
+  D.market.txf=n; D.market.txfChg = c===null||c===''? null : parseFloat(c);
+  save(); renderMarket();
+}
+
+// ============ WINSMART 移動停利監控（日K走證交所 STOCK_DAY）============
+let pollTimer=null;
+function saveMonCfg(){ D.monCfg={atrMul:+document.getElementById('p_atrMul').value, retr:+document.getElementById('p_retr').value, maxLoss:+document.getElementById('p_maxloss').value}; save(); }
+function loadMonCfg(){ const c=D.monCfg||{}; document.getElementById('p_atrMul').value=c.atrMul??2.5; document.getElementById('p_retr').value=c.retr??8; document.getElementById('p_maxloss').value=c.maxLoss??50000; }
+function ladderFloor(cost,price){ const g=(price-cost)/cost; const L=[[0.15,0.10],[0.10,0.06],[0.06,0.03],[0.03,0.00]];
+  for(const [t,lock] of L){ if(g>=t) return cost*(1+lock); } return null; }
+async function twseDaily(code){ // 證交所 STOCK_DAY（僅上市）
+  const now=new Date();
+  const ym=d=>''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+'01';
+  const prev=new Date(now.getFullYear(), now.getMonth()-1, 1);
+  let rows=[];
+  for(const mm of [ym(prev), ym(now)]){
+    const url='https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date='+mm+'&stockNo='+code;
+    const j=await tryFetch(proxied(url), vDay); if(j&&j.data) rows=rows.concat(j.data);
+  }
+  if(!rows.length) return null;
+  const highs=[],lows=[],closes=[];
+  for(const r of rows){ const h=parseFloat(String(r[4]).replace(/,/g,'')), l=parseFloat(String(r[5]).replace(/,/g,'')), c=parseFloat(String(r[6]).replace(/,/g,''));
+    if(!isNaN(h)&&!isNaN(l)){ highs.push(h); lows.push(l); closes.push(c); } }
+  return highs.length? {highs,lows,closes,prevClose:closes[closes.length-1]} : null;
+}
+async function runMonitor(){
+  const r=compute(); const codes=[...new Set(r.holds.map(h=>h.code))];
+  const st=document.getElementById('monStatus'); st.style.color='var(--muted)'; st.textContent='向證交所抓日K算ATR…';
+  let ok=0, manual=[];
+  for(const c of codes){
+    if(marketOf(c)==='otc'){ manual.push(c); continue; } // 上櫃證交所無此表，走手動
+    const k=await twseDaily(c);
+    if(k){
+      const n=Math.min(14,k.highs.length); let atr=0,cnt=0;
+      for(let i=k.highs.length-n;i<k.highs.length;i++){ atr+=(k.highs[i]-k.lows[i]); cnt++; }
+      D._atr=D._atr||{}; D._atr[c]=cnt?atr/cnt:0;
+      D._low3=D._low3||{}; D._low3[c]=Math.min(...k.lows.slice(-3));
+      D.peaks=D.peaks||{}; D.peaks[c]=Math.max(D.peaks[c]||0, Math.max(...k.highs.slice(-20)), r.px[c]||0);
+      if(k.prevClose){ D.prevClose=D.prevClose||{}; D.prevClose[c]=k.prevClose; }
+      ok++;
+    } else manual.push(c);
+  }
+  save(); renderMonitor();
+  let msg='✓ 上市自動更新 '+ok+' 檔';
+  if(manual.length) msg+='；'+manual.join('、')+'（上櫃/失敗）請點表格數字手動填 ATR、3日低、波段高';
+  st.style.color= ok?'var(--down)':'var(--amber)'; st.textContent=msg;
+}
+function editAtr(c){ const v=prompt('輸入 '+c+' 的 ATR 值（每日波動幅度，可從看盤軟體看）：',(D._atr&&D._atr[c])||''); if(v===null)return; const n=parseFloat(v); if(!isNaN(n)){ D._atr=D._atr||{}; D._atr[c]=n; save(); renderMonitor(); } }
+function editLow3(c){ const v=prompt('輸入 '+c+' 的近 3 日最低價：',(D._low3&&D._low3[c])||''); if(v===null)return; const n=parseFloat(v); if(!isNaN(n)){ D._low3=D._low3||{}; D._low3[c]=n; save(); renderMonitor(); } }
+function renderMonitor(){
+  const r=compute(); const cfg=D.monCfg||{atrMul:2.5,retr:8,maxLoss:50000};
+  const tb=document.querySelector('#monTable tbody'); tb.innerHTML='';
+  const codes=[...new Set(r.holds.map(h=>h.code))];
+  let breaches=[];
+  for(const c of codes){
+    const h=r.holds.find(x=>x.code===c); const px=r.px[c]||0;
+    const peak=D.peaks&&D.peaks[c]?D.peaks[c]:px;
+    const atr=(D._atr&&D._atr[c])||0;
+    const low3=(D._low3&&D._low3[c])||0;
+    const atrLine = atr? peak - cfg.atrMul*atr : null;
+    const ladder = ladderFloor(h.avg, px);
+    const retrLine = peak*(1-cfg.retr/100);
+    const lines=[['ATR停利',atrLine],['階梯保底',ladder],['回檔線',retrLine],['3日低',low3||null]].filter(x=>x[1]>0);
+    const guard = lines.length? Math.max(...lines.map(x=>x[1])) : null;
+    const breached = guard && px>0 && px<guard;
+    if(breached) breaches.push(h.name);
+    const ledc = breached?'var(--danger)' : (guard && px< guard*1.02 ? 'var(--amber)':'var(--down)');
+    const stTxt = breached?'🔴 跌破':(guard && px<guard*1.02?'🟡 接近':'🟢 安全');
+    const cell=v=> v? fmt(v,2):'—';
+    const dash='cursor:pointer;border-bottom:1px dashed var(--dim)';
+    tb.innerHTML+=`<tr><td>${h.name} <span class="tag">${c}</span></td><td class="num">${fmt(px,2)}</td>
+      <td class="num"><span onclick="editPeak('${c}')" style="${dash}">${fmt(peak,2)}</span></td>
+      <td class="num"><span onclick="editAtr('${c}')" style="${dash}" title="點擊手動填ATR">${cell(atrLine)}</span></td><td class="num">${cell(ladder)}</td><td class="num">${cell(retrLine)}</td>
+      <td class="num"><span onclick="editLow3('${c}')" style="${dash}" title="點擊手動填3日低">${cell(low3)}</span></td>
+      <td class="num" style="font-weight:700;color:${ledc}">${cell(guard)}</td>
+      <td style="color:${ledc};font-weight:600">${stTxt}</td></tr>`;
+  }
+  // 全戶當日損益
+  let dayPnl=0, have=false;
+  for(const h of r.holds){ const pc=D.prevClose&&D.prevClose[h.code]; if(pc){ have=true; dayPnl += (r.px[h.code]-pc)*h.shares; } }
+  const db=document.getElementById('dayLossBanner');
+  if(have){
+    if(dayPnl <= -Math.abs(cfg.maxLoss)){ db.className='banner danger'; db.innerHTML='🔴 全戶當日損益 '+signTxt(dayPnl)+'，已達設定的最大虧損 '+fmt(cfg.maxLoss)+'，WINSMART 緊急防禦訊號！'; }
+    else { db.className='banner '+(dayPnl<0?'warn':'safe'); db.innerHTML='全戶當日損益（對昨收）：'+signTxt(dayPnl)+(dayPnl<0?'　距離緊急線 '+fmt(cfg.maxLoss+dayPnl):''); }
+  } else db.innerHTML='';
+  // 通知
+  if(breaches.length && document.getElementById('notifyOn') && document.getElementById('notifyOn').checked && window.Notification && Notification.permission==='granted'){
+    const key=breaches.join(','); if(window._lastNotify!==key){ window._lastNotify=key; new Notification('停利線示警', {body:'跌破：'+breaches.join('、')}); }
+  }
+}
+function editPeak(c){ const v=prompt('手動設定 '+c+' 的波段最高價：', (D.peaks&&D.peaks[c])||''); if(v===null)return; const n=parseFloat(v); if(!isNaN(n)){ D.peaks=D.peaks||{}; D.peaks[c]=n; save(); renderMonitor(); } }
+function askNotify(){ if(document.getElementById('notifyOn').checked && window.Notification && Notification.permission!=='granted'){ Notification.requestPermission(); } }
+function togglecPoll(){
+  if(document.getElementById('autoPoll').checked){ pollTimer=setInterval(async()=>{ await fetchPrices(); renderMonitor(); }, 30000); }
+  else { clearInterval(pollTimer); pollTimer=null; }
+}
+
+// ============ 券商 Excel／CSV 匯入 ============
+let _impRows=null, _impHeaders=null;
+function loadSheetJS(){ return new Promise((res,rej)=>{ if(window.XLSX) return res(); const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+async function parseBrokerFile(e){
+  const f=e.target.files[0]; if(!f) return; const st=document.getElementById('impStatus');
+  st.style.color='var(--muted)'; st.textContent='讀取中…';
+  try{
+    await loadSheetJS();
+    const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    // 找標題列：含「日期」或「股票」或「成交」的那列
+    let hi=rows.findIndex(r=>r.some(c=>/日期|股票|代碼|成交|買賣|交易/.test(String(c))));
+    if(hi<0) hi=0;
+    _impHeaders=rows[hi].map(x=>String(x).trim());
+    _impRows=rows.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!==''));
+    buildMapUI(); document.getElementById('mapArea').style.display='block';
+    st.style.color='var(--down)'; st.textContent='讀到 '+_impRows.length+' 列，請確認欄位對應';
+  }catch(err){ st.style.color='var(--amber)'; st.textContent='讀取失敗：'+err.message+'（CSV 可另存 UTF-8 再試）'; }
+  e.target.value='';
+}
+function guessCol(keys){ for(let i=0;i<_impHeaders.length;i++){ for(const k of keys){ if(_impHeaders[i].includes(k)) return i; } } return -1; }
+function buildMapUI(){
+  const fields=[['date','日期',['日期','成交日','交易日']],['type','買賣別',['買賣','交易類別','類別','別']],
+    ['code','代碼',['代碼','股票','商品']],['name','名稱',['名稱']],['shares','股數',['股數','成交量','數量']],['price','成交價',['成交均價','成交價','價格','均價','單價']]];
+  const opts=i=>_impHeaders.map((h,j)=>`<option value="${j}" ${j===i?'selected':''}>${h||('第'+(j+1)+'欄')}</option>`).join('');
+  document.getElementById('mapRow').innerHTML = fields.map(([k,lbl,keys])=>{
+    const g=guessCol(keys);
+    return `<label><div class="flbl">${lbl}</div><select id="map_${k}"><option value="-1">（無）</option>${opts(g)}</select></label>`;
+  }).join('');
+  // preview
+  const pv=document.getElementById('previewTable');
+  pv.innerHTML='<thead><tr>'+_impHeaders.map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>'+
+    _impRows.slice(0,8).map(r=>'<tr>'+_impHeaders.map((_,j)=>`<td>${r[j]??''}</td>`).join('')+'</tr>').join('')+'</tbody>';
+  document.getElementById('previewInfo').textContent='共 '+_impRows.length+' 列，預覽前 8 列';
+}
+function confirmImport(){
+  const gi=k=>+document.getElementById('map_'+k).value;
+  const di=gi('date'),ti=gi('type'),ci=gi('code'),ni=gi('name'),si=gi('shares'),pi=gi('price');
+  if(di<0||ci<0||si<0||pi<0){ alert('日期、代碼、股數、成交價為必填欄位'); return; }
+  let added=0;
+  for(const r of _impRows){
+    const rawType=String(r[ti]||'');
+    const isBuy = /買|買進|現買|現股買/.test(rawType);
+    const isSell = /賣|賣出|現賣|現股賣/.test(rawType);
+    let dateRaw=String(r[di]||'').trim();
+    let iso=normDate(dateRaw); if(!iso) continue;
+    let code=String(r[ci]||'').replace(/[^0-9A-Za-z]/g,'').match(/\d{4,6}/); code=code?code[0]:String(r[ci]||'').trim();
+    const shares=parseFloat(String(r[si]).replace(/[^0-9.]/g,''))||0;
+    const price=parseFloat(String(r[pi]).replace(/[^0-9.]/g,''))||0;
+    if(!code||!shares||!price) continue;
+    const name = ni>=0? String(r[ni]||'').replace(/\(.*?\)/,'').trim()||code : code;
+    D.transactions.push({date:iso, type:isSell?'sell':'buy', code, name, shares, price});
+    if(D.prices[code]===undefined) D.prices[code]=price;
+    D.markets=D.markets||{}; if(!D.markets[code]) D.markets[code]='tse';
+    added++;
+  }
+  save(); cancelImport(); renderAll();
+  const st=document.getElementById('impStatus'); st.style.color='var(--down)'; st.textContent='✓ 已匯入 '+added+' 筆交易';
+}
+function normDate(s){ s=String(s).trim();
+  let m=s.match(/(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+  if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  m=s.match(/(\d{3})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if(m) return (+m[1]+1911)+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  const d=s.replace(/\D/g,'');
+  if(d.length===8) return d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);
+  if(d.length===7) return (+d.slice(0,3)+1911)+'-'+d.slice(3,5)+'-'+d.slice(5,7);
+  return ''; }
+function cancelImport(){ document.getElementById('mapArea').style.display='none'; _impRows=null; }
+
+function tab(id){ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id)); }
+function renderAll(){ render(); renderTx(); renderOther(); renderDiv(); renderUpcoming(); drawMrChart(); renderSettings(); renderMonitor(); renderMarket(); }
+loadMonCfg();
+snapshot(false);
+renderAll();
+</script>
+</body>
+</html>
